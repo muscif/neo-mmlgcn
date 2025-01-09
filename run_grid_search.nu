@@ -18,6 +18,7 @@ for n_layers in $l_n_layers {
                 $conf = $conf |
                     update n_layers $n_layers |
                     update embedding_dim $embedding_dim |
+                    update fusion $fusion |
                     update multimodal $multimodal
     
                 $conf | to toml | save -f config.toml

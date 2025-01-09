@@ -1,7 +1,7 @@
 n_layers = 0
 device = "cuda"
 batch_size = 2048
-embedding_dim = 64
+embedding_dim = 512
 learning_rate = 0.001
 dataset = "dbbook"
 epochs = 150
