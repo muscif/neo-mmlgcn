@@ -1,0 +1,23 @@
+n_layers = 0
+device = "cuda"
+batch_size = 2048
+embedding_dim = 1024
+learning_rate = 0.001
+dataset = "dbbook"
+epochs = 150
+top_k = 50
+model = "ef-mmlgcn"
+fusion = "attention"
+multimodal = true
+
+[datasets]
+dbbook = [
+    "images",
+    "text",
+]
+ml1m = [
+    "audio",
+    "images",
+    "text",
+    "video",
+]
