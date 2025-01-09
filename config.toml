@@ -1,15 +1,20 @@
 n_layers = 0
 device = "cuda"
 batch_size = 2048
-embedding_dim = 1024
+embedding_dim = 64
 learning_rate = 0.001
 dataset = "dbbook"
 epochs = 150
 model = "ef-mmlgcn"
 fusion = "max"
-top_k = [5, 10, 20, 50]
+top_k = [
+    5,
+    10,
+    20,
+    50,
+]
 seed = 19
-multimodal = true
+multimodal = false
 
 [datasets]
 dbbook = [

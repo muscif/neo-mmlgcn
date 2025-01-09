@@ -245,6 +245,9 @@ def attention(Q, K, V):
 
 def print_config():
     d = CONFIG.__dict__
-    d.pop("datasets")
+    
+    if "datasets" in d:
+        d.pop("datasets")
+    
     print("CONFIGURATION")
     print(tabulate(d.items()))
