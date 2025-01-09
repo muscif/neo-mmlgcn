@@ -5,9 +5,10 @@ embedding_dim = 1024
 learning_rate = 0.001
 dataset = "dbbook"
 epochs = 150
-top_k = 50
 model = "ef-mmlgcn"
-fusion = "attention"
+fusion = "max"
+top_k = [5, 10, 20, 50]
+seed = 19
 multimodal = true
 
 [datasets]

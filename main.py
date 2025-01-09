@@ -3,9 +3,13 @@ from torch_geometric.nn import LightGCN
 from tabulate import tabulate
 
 from datetime import datetime
+import random
 
-from utils import train, test, CONFIG, MMDataset
+from utils import train, test, CONFIG, MMDataset, print_config
 from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
+
+torch.manual_seed(CONFIG.seed)
+random.seed(CONFIG.seed)
 
 models = {
     "ef-mmlgcn": EF_MMLGCN,
@@ -48,9 +52,14 @@ optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG.learning_rate)
 
 out = []
 out.append(CONFIG)
-headers = ["Epoch", "Loss", "Recall", "Precision", "NDCG"]
+headers = ["Epoch", "Loss"]
+
+for k in CONFIG.top_k:
+    headers.extend([f"Precision@{k}", f"Recall@{k}", f"NDCG@{k}"])
 
 out.append(headers)
+
+print_config()
 
 for epoch in range(CONFIG.epochs):
     loss = train(
@@ -63,15 +72,19 @@ for epoch in range(CONFIG.epochs):
         data
     )
 
-    precision, recall, ndcg = test(
+    res = test(
         model,
         data,
         num_users,
-        train_edge_label_index,
-        k=CONFIG.top_k
+        train_edge_label_index
     )
 
-    metrics = [epoch+1, f"{loss:.4f}", f"{recall:.4f}", f"{precision:.4f}", f"{ndcg:.4f}"]
+    metrics = [epoch + 1, f"{loss:.4f}"]
+
+    for k in CONFIG.top_k:
+        precision, recall, ndcg = res[k]
+        metrics.extend([round(precision, 4), round(recall, 4), round(ndcg, 4)])
+
     out.append(metrics)
 
     print(tabulate([headers, metrics], tablefmt="plain"))
