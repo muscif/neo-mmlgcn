@@ -1,4 +1,4 @@
-{"n_layers": 0, "device": "cuda", "batch_size": 2048, "embedding_dim": 64, "learning_rate": 0.001, "dataset": "dbbook", "epochs": 150, "model": "ef-mmlgcn", "fusion": "max", "top_k": [5, 10, 20, 50], "seed": 19, "multimodal": false}
+{"n_layers": 0, "device": "cuda", "batch_size": 2048, "embedding_dim": 64, "learning_rate": 0.001, "dataset": "dbbook", "epochs": 150, "model": "ef-mmlgcn", "fusion": "mean", "top_k": [5, 10, 20, 50], "seed": 19, "multimodal": false}
 Epoch	Loss	Precision@5	Recall@5	NDCG@5	Precision@10	Recall@10	NDCG@10	Precision@20	Recall@20	NDCG@20	Precision@50	Recall@50	NDCG@50
 1	0.6931	0.0014	0.001	0.0014	0.0015	0.0023	0.0018	0.0015	0.0047	0.0028	0.0014	0.0107	0.0049
 2	0.6922	0.0024	0.0021	0.0026	0.0023	0.0037	0.003	0.0022	0.007	0.0044	0.0019	0.0144	0.0071
