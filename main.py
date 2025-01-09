@@ -100,3 +100,5 @@ with open(f"logs/{dt}.log", "w", encoding="utf-8") as fout:
 
     for el in out[2:]:
         fout.write(f"{'\t'.join([str(e) for e in el])}\n")
+
+print_config()
