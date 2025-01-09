@@ -1,9 +1,10 @@
 let base_conf = open config.toml
 
-const l_n_layers = [0, 1, 2, 3]
-const l_embedding_dim = [64, 128, 512, 1024, 2048]
+const l_n_layers = [0, 4]
+const l_embedding_dim = [1024, 2048, 4096]
 const l_fusion = ["max", "mean"]
 const l_multimodal = [false, true]
+const l_single_branch = [false, true]
 
 mut i = 0
 let tot = (($l_n_layers | length) * ($l_embedding_dim | length) * ($l_fusion | length) * ($l_multimodal | length)) | into string

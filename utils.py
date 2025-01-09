@@ -136,35 +136,6 @@ def train(
     return total_loss / total_examples
 
 
-def get_metrics(logits, ground_truth, node_count, k):
-    # Get top-k predictions
-    precision = recall = ndcg = 0
-
-    topk_index = logits.topk(k, dim=-1).indices
-    isin_mat = ground_truth.gather(1, topk_index)
-
-    # Calculate precision and recall
-    precision += float((isin_mat.sum(dim=-1) / k).sum())
-    recall += float((isin_mat.sum(dim=-1) / node_count.clamp(1e-6)).sum())
-
-    # Calculate NDCG
-    num_relevant = torch.minimum(node_count, torch.tensor(k))
-    ideal_positions = torch.arange(k, device=logits.device)
-    dcg_weights = 1 / torch.log2(ideal_positions + 2)
-
-    dcg = (isin_mat * dcg_weights).sum(dim=-1)
-
-    idcg = torch.zeros_like(dcg)
-    mask = torch.arange(k, device=logits.device)[None, :] < num_relevant[:, None]
-    idcg = (mask * dcg_weights[None, :]).sum(dim=1)
-
-    # Compute NDCG and check whether IDCG is 0
-    valid_mask = idcg > 0
-    ndcg += float((dcg[valid_mask] / idcg[valid_mask]).sum())
-
-    return precision, recall, ndcg
-
-
 @torch.no_grad()
 def test(model, data, num_users, train_edge_label_index):
     emb = model.get_embedding(data.edge_index)
@@ -245,9 +216,23 @@ def attention(Q, K, V):
 
 def print_config():
     d = CONFIG.__dict__
-    
+
     if "datasets" in d:
         d.pop("datasets")
-    
+
     print("CONFIGURATION")
     print(tabulate(d.items()))
+
+
+def is_early_stop(vector):
+    # Computes the derivative of the vector and
+    # checks whether the relative difference between the
+    # maximum and minimum value is smaller than the threshold
+    diff = np.diff(vector)
+
+    min = diff.min(initial=0)
+    max = diff.max(initial=0)
+
+    val = abs(max - min) / max
+
+    return val < CONFIG.early_stop_threshold

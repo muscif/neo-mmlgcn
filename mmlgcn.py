@@ -87,7 +87,12 @@ def get_mm_embeddings_sb(pretrained_modality_embeddings: list):
 class EF_MMLGCN(LightGCN):
     def __init__(self, num_nodes, num_layers, pretrained_modality_embeddings, alpha = None, **kwargs):
         super().__init__(num_nodes, CONFIG.embedding_dim, num_layers, alpha, **kwargs)
-        mm_embeddings = get_mm_embeddings(list(pretrained_modality_embeddings.values()))
+        pt_mm_emb = list(pretrained_modality_embeddings.values())
+
+        if CONFIG.single_branch:
+            mm_embeddings = get_mm_embeddings_sb(pt_mm_emb)
+        else:
+            mm_embeddings = get_mm_embeddings(pt_mm_emb)
 
         self.num_items = len(mm_embeddings[0])
         self.num_users = num_nodes - self.num_items

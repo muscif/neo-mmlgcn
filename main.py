@@ -5,7 +5,7 @@ from tabulate import tabulate
 from datetime import datetime
 import random
 
-from utils import train, test, CONFIG, MMDataset, print_config
+from utils import train, test, CONFIG, MMDataset, print_config, is_early_stop
 from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
 torch.manual_seed(CONFIG.seed)
@@ -79,7 +79,7 @@ for epoch in range(CONFIG.epochs):
         train_edge_label_index
     )
 
-    metrics = [epoch + 1, f"{loss:.4f}"]
+    metrics = [epoch + 1, round(loss, 4)]
 
     for k in CONFIG.top_k:
         precision, recall, ndcg = res[k]
@@ -87,9 +87,14 @@ for epoch in range(CONFIG.epochs):
 
     out.append(metrics)
 
+    prev_losses = [l[1] for l in out[2:][-CONFIG.early_stop_n:]]
+    if is_early_stop(prev_losses):
+        break
+
     print(tabulate([headers, metrics], tablefmt="plain"))
     print()
 
+exit()
 dt = datetime.now().replace(microsecond=0).isoformat()
 with open(f"logs/{dt}.log", "w", encoding="utf-8") as fout:
     conf = out[0]
