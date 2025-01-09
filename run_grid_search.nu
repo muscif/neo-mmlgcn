@@ -12,7 +12,7 @@ for n_layers in $l_n_layers {
     for embedding_dim in $l_embedding_dim {
         for fusion in $l_fusion {
             for multimodal in $l_multimodal {
-                print "PROGRESS: " + ($i|into string) + "/" + $tot
+                print ("PROGRESS: " + ($i|into string) + "/" + $tot)
 
                 mut conf = $base_conf
                 $conf = $conf |
