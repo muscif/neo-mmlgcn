@@ -14,7 +14,7 @@ top_k = [
     50,
 ]
 seed = 19
-multimodal = false
+multimodal = true
 
 [datasets]
 dbbook = [

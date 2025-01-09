@@ -1,9 +1,19 @@
 let base_conf = open config.toml
 
-for n_layers in [0, 1, 2, 3] {
-    for embedding_dim in [64, 128, 256, 512, 1024, 2048] {
-        for fusion in ["max", "mean"] {
-            for multimodal in [false, true] {
+const l_n_layers = [0, 1, 2, 3]
+const l_embedding_dim = [64, 128, 512, 1024, 2048]
+const l_fusion = ["max", "mean"]
+const l_multimodal = [false, true]
+
+mut i = 0
+let tot = (($l_n_layers | length) * ($l_embedding_dim | length) * ($l_fusion | length) * ($l_multimodal | length)) | into string
+
+for n_layers in $l_n_layers {
+    for embedding_dim in $l_embedding_dim {
+        for fusion in $l_fusion {
+            for multimodal in $l_multimodal {
+                print "PROGRESS: " + ($i|into string) + "/" + $tot
+
                 mut conf = $base_conf
                 $conf = $conf |
                     update n_layers $n_layers |
@@ -12,6 +22,7 @@ for n_layers in [0, 1, 2, 3] {
     
                 $conf | to toml | save -f config.toml
                 py main.py
+                $i += 1
             }
         }
     }
