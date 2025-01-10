@@ -206,14 +206,6 @@ def test(model, data, num_users, train_edge_label_index):
 
     return res
 
-
-def attention(Q, K, V):
-    attention_scores = F.softmax((Q @ K.mT) / sqrt(CONFIG.embedding_dim), dim=-1)
-    out = attention_scores @ V
-
-    return out
-
-
 def print_config():
     d = CONFIG.__dict__
 
@@ -222,17 +214,3 @@ def print_config():
 
     print("CONFIGURATION")
     print(tabulate(d.items()))
-
-
-def is_early_stop(vector):
-    # Computes the derivative of the vector and
-    # checks whether the relative difference between the
-    # maximum and minimum value is smaller than the threshold
-    diff = np.diff(vector)
-
-    min = diff.min(initial=0)
-    max = diff.max(initial=0)
-
-    val = abs(max - min) / max
-
-    return val < CONFIG.early_stop_threshold
