@@ -6,26 +6,13 @@ learning_rate = 0.001
 dataset = "dbbook"
 epochs = 150
 model = "ef-mmlgcn"
-fusion = "sum"
-top_k = [
-    5,
-    10,
-    20,
-    50,
-]
+fusion_modalities = "mean"
+top_k = [5, 10, 20, 50]
 seed = 19
 multimodal = true
-single_branch = true
-freeze = false
+single_branch = false
+freeze = true
 
 [datasets]
-dbbook = [
-    "images",
-    "text",
-]
-ml1m = [
-    "audio",
-    "images",
-    "text",
-    "video",
-]
+dbbook = ["images", "text"]
+ml1m = ["audio", "images", "text", "video"]

@@ -1,11 +1,10 @@
 import json
 import os.path as osp
-from math import sqrt
 
 import numpy as np
 import toml
 import torch
-import torch.nn.functional as F
+import torch.nn as nn
 from torch_geometric.data import HeteroData
 from torch_geometric.utils import degree
 from tqdm import tqdm
@@ -89,6 +88,34 @@ class MMDataset:
             self.data["user", "rates", "item"][attr_name] = index
             if attr_name == "edge_index":
                 self.data["item", "rated_by", "user"][attr_name] = index.flip([0])
+
+
+class Attention(nn.Module):
+    def __init__(self, embedding_dim, attention_dim):
+        super().__init__()
+        self.kq = nn.Linear(embedding_dim, attention_dim).to(CONFIG.device)
+        self.v = nn.Linear(embedding_dim, embedding_dim).to(CONFIG.device)
+
+    def forward(self, q, k, v):
+        q = self.kq(q)
+        k = self.kq(k)
+        v = self.v(v)
+
+        scores = q @ torch.transpose(k, 1, 2)
+        scores = scores / (k.shape[2] ** 0.5)
+        scores = nn.functional.softmax(scores, dim=2)
+        scores = scores @ v
+
+        return scores.squeeze(1)
+
+class SelfAttention(Attention):
+    def forward(self, q):
+        return super().forward(q, q, q)
+
+class CrossAttention(Attention):
+    def forward(self, t1, t2):
+        return super().forward(t1, t2, t2)
+
 
 
 def train(
@@ -205,6 +232,7 @@ def test(model, data, num_users, train_edge_label_index):
         res[k] = precision, recall, ndcg
 
     return res
+
 
 def print_config():
     d = CONFIG.__dict__

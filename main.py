@@ -5,8 +5,8 @@ from tabulate import tabulate
 from datetime import datetime
 import random
 
-from utils import train, test, CONFIG, MMDataset, print_config, is_early_stop
-from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN, WLF_MMLGCN, WEF_MMLGCN
+from utils import train, test, CONFIG, MMDataset, print_config
+from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN, EMF_MMLGCN, LMF_MMLGCN
 
 torch.manual_seed(CONFIG.seed)
 random.seed(CONFIG.seed)
@@ -15,6 +15,8 @@ models = {
     "ef-mmlgcn": EF_MMLGCN,
     "lf-mmlgcn": LF_MMLGCN,
     "if-mmlgcn": IF_MMLGCN,
+    "emf-mmlgcn": EMF_MMLGCN,
+    "lmf-mmlgcn": LMF_MMLGCN,
 }
 
 Model = models[CONFIG.model]
@@ -39,7 +41,7 @@ if CONFIG.multimodal:
     model = Model(
         num_nodes=data.num_nodes,
         num_layers=CONFIG.n_layers,
-        pretrained_modality_embeddings=dataset.embeddings
+        pretrained_modality_embeddings=dataset.embeddings,
     ).to(CONFIG.device)
 else:
     model = LightGCN(
@@ -48,7 +50,7 @@ else:
         num_layers=CONFIG.n_layers,
     ).to(CONFIG.device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG.learning_rate)
+optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG.learning_rate, fused=True)
 
 out = []
 out.append(CONFIG)
@@ -69,15 +71,10 @@ for epoch in range(CONFIG.epochs):
         num_items,
         optimizer,
         model,
-        data
+        data,
     )
 
-    res = test(
-        model,
-        data,
-        num_users,
-        train_edge_label_index
-    )
+    res = test(model, data, num_users, train_edge_label_index)
 
     metrics = [epoch + 1, round(loss, 4)]
 
@@ -86,10 +83,6 @@ for epoch in range(CONFIG.epochs):
         metrics.extend([round(precision, 4), round(recall, 4), round(ndcg, 4)])
 
     out.append(metrics)
-
-    prev_losses = [l[1] for l in out[2:][-CONFIG.early_stop_n:]]
-    if is_early_stop(prev_losses):
-        break
 
     print(tabulate([headers, metrics], tablefmt="plain"))
     print()
