@@ -108,14 +108,15 @@ class Attention(nn.Module):
 
         return scores.squeeze(1)
 
+
 class SelfAttention(Attention):
     def forward(self, q):
         return super().forward(q, q, q)
 
+
 class CrossAttention(Attention):
     def forward(self, t1, t2):
         return super().forward(t1, t2, t2)
-
 
 
 def train(
@@ -149,15 +150,16 @@ def train(
         optimizer.zero_grad()
         pos_rank, neg_rank = model(data.edge_index, edge_label_index).chunk(2)
 
-        loss = model.recommendation_loss(
+        rec_loss = model.recommendation_loss(
             pos_rank,
             neg_rank,
             node_id=edge_label_index.unique(),
         )
-        loss.backward()
+        rec_loss.backward(retain_graph=True)
+
         optimizer.step()
 
-        total_loss += loss.item() * pos_rank.numel()
+        total_loss += rec_loss.item() * pos_rank.numel()
         total_examples += pos_rank.numel()
 
     return total_loss / total_examples
