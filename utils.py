@@ -237,7 +237,7 @@ def test(model, data, num_users, train_edge_label_index):
 
 
 def print_config():
-    d = CONFIG.__dict__
+    d = dict(CONFIG.__dict__)
 
     if "datasets" in d:
         d.pop("datasets")
