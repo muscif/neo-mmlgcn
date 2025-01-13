@@ -13,7 +13,7 @@ autoencoder = false
 multimodal = true
 single_branch = false
 freeze = true
-log = false
+log = true
 
 [datasets]
 dbbook = ["images", "text"]

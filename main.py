@@ -88,19 +88,17 @@ def main():
         print(tabulate([headers, metrics], tablefmt="plain"))
         print()
 
-    exit()
-    dt = datetime.now().replace(microsecond=0).isoformat()
-    with open(f"logs/{dt}.log", "w", encoding="utf-8") as fout:
-        conf = out[0]
-        header = out[1]
+    if CONFIG.log:
+        dt = datetime.now().replace(microsecond=0).isoformat()
+        with open(f"logs/{dt}.log", "w", encoding="utf-8") as fout:
+            conf = out[0]
+            header = out[1]
 
-        fout.write(f"{conf}\n")
-        fout.write(f"{'\t'.join(header)}\n")
+            fout.write(f"{conf}\n")
+            fout.write(f"{'\t'.join(header)}\n")
 
-        for el in out[2:]:
-            fout.write(f"{'\t'.join([str(e) for e in el])}\n")
-
-    print_config()
+            for el in out[2:]:
+                fout.write(f"{'\t'.join([str(e) for e in el])}\n")
 
 if __name__=="__main__":
     main()
