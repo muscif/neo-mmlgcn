@@ -19,84 +19,88 @@ models = {
     "lmf-mmlgcn": LMF_MMLGCN,
 }
 
-Model = models[CONFIG.model]
+def main():
+    Model = models[CONFIG.model]
 
-dataset = MMDataset()
-hdata = dataset.data
+    dataset = MMDataset()
+    hdata = dataset.data
 
-num_users = hdata["user"].num_nodes
-num_items = hdata["item"].num_nodes
-data = hdata.to_homogeneous().to(CONFIG.device)
+    num_users = hdata["user"].num_nodes
+    num_items = hdata["item"].num_nodes
+    data = hdata.to_homogeneous().to(CONFIG.device)
 
-# Use all message passing edges as training labels
-mask = data.edge_index[0] < data.edge_index[1]
-train_edge_label_index = data.edge_index[:, mask]
-train_loader = torch.utils.data.DataLoader(
-    range(train_edge_label_index.size(1)),
-    shuffle=True,
-    batch_size=CONFIG.batch_size,
-)
-
-if CONFIG.multimodal:
-    model = Model(
-        num_nodes=data.num_nodes,
-        num_layers=CONFIG.n_layers,
-        pretrained_modality_embeddings=dataset.embeddings,
-    ).to(CONFIG.device)
-else:
-    model = LightGCN(
-        num_nodes=data.num_nodes,
-        embedding_dim=CONFIG.embedding_dim,
-        num_layers=CONFIG.n_layers,
-    ).to(CONFIG.device)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG.learning_rate, fused=True)
-
-out = []
-out.append(CONFIG)
-headers = ["Epoch", "Loss"]
-
-for k in CONFIG.top_k:
-    headers.extend([f"Precision@{k}", f"Recall@{k}", f"NDCG@{k}"])
-
-out.append(headers)
-
-print_config()
-
-for epoch in range(CONFIG.epochs):
-    loss = train(
-        train_loader,
-        train_edge_label_index,
-        num_users,
-        num_items,
-        optimizer,
-        model,
-        data,
+    # Use all message passing edges as training labels
+    mask = data.edge_index[0] < data.edge_index[1]
+    train_edge_label_index = data.edge_index[:, mask]
+    train_loader = torch.utils.data.DataLoader(
+        range(train_edge_label_index.size(1)),
+        shuffle=True,
+        batch_size=CONFIG.batch_size,
     )
 
-    res = test(model, data, num_users, train_edge_label_index)
+    if CONFIG.multimodal:
+        model = Model(
+            num_nodes=data.num_nodes,
+            num_layers=CONFIG.n_layers,
+            pretrained_modality_embeddings=dataset.embeddings,
+        ).to(CONFIG.device)
+    else:
+        model = LightGCN(
+            num_nodes=data.num_nodes,
+            embedding_dim=CONFIG.embedding_dim,
+            num_layers=CONFIG.n_layers,
+        ).to(CONFIG.device)
 
-    metrics = [epoch + 1, round(loss, 4)]
+    optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG.learning_rate, fused=True)
+
+    out = []
+    out.append(CONFIG)
+    headers = ["Epoch", "Loss"]
 
     for k in CONFIG.top_k:
-        precision, recall, ndcg = res[k]
-        metrics.extend([round(precision, 4), round(recall, 4), round(ndcg, 4)])
+        headers.extend([f"Precision@{k}", f"Recall@{k}", f"NDCG@{k}"])
 
-    out.append(metrics)
+    out.append(headers)
 
-    print(tabulate([headers, metrics], tablefmt="plain"))
-    print()
+    print_config()
 
-exit()
-dt = datetime.now().replace(microsecond=0).isoformat()
-with open(f"logs/{dt}.log", "w", encoding="utf-8") as fout:
-    conf = out[0]
-    header = out[1]
+    for epoch in range(CONFIG.epochs):
+        loss = train(
+            train_loader,
+            train_edge_label_index,
+            num_users,
+            num_items,
+            optimizer,
+            model,
+            data,
+        )
 
-    fout.write(f"{conf}\n")
-    fout.write(f"{'\t'.join(header)}\n")
+        res = test(model, data, num_users, train_edge_label_index)
 
-    for el in out[2:]:
-        fout.write(f"{'\t'.join([str(e) for e in el])}\n")
+        metrics = [epoch + 1, round(loss, 4)]
 
-print_config()
+        for k in CONFIG.top_k:
+            precision, recall, ndcg = res[k]
+            metrics.extend([round(precision, 4), round(recall, 4), round(ndcg, 4)])
+
+        out.append(metrics)
+
+        print(tabulate([headers, metrics], tablefmt="plain"))
+        print()
+
+    exit()
+    dt = datetime.now().replace(microsecond=0).isoformat()
+    with open(f"logs/{dt}.log", "w", encoding="utf-8") as fout:
+        conf = out[0]
+        header = out[1]
+
+        fout.write(f"{conf}\n")
+        fout.write(f"{'\t'.join(header)}\n")
+
+        for el in out[2:]:
+            fout.write(f"{'\t'.join([str(e) for e in el])}\n")
+
+    print_config()
+
+if __name__=="__main__":
+    main()

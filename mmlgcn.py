@@ -77,6 +77,7 @@ def fuse_prod(stacked_embeddings):
 
 
 fusion_fn = {
+    "concat": fuse_concat,
     "mean": fuse_mean,
     "sum": fuse_sum,
     "max": fuse_max,
