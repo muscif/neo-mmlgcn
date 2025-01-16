@@ -1,17 +1,18 @@
 n_layers = 0
 device = "cuda"
 batch_size = 2048
-embedding_dim = 1024
+embedding_dim = 128
 learning_rate = 0.001
 dataset = "dbbook"
-epochs = 150
-model = "lmf-mmlgcn"
+epochs = 1000
+model = "ef-mmlgcn"
 fusion_modalities = "mean"
 top_k = [5, 10, 20, 50]
 seed = 19
 autoencoder = false
 multimodal = true
 single_branch = false
+bidirectional = false
 freeze = true
 log = true
 

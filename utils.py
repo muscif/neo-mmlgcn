@@ -86,8 +86,10 @@ class MMDataset:
             index = torch.tensor([rows, cols])
 
             self.data["user", "rates", "item"][attr_name] = index
-            if attr_name == "edge_index":
-                self.data["item", "rated_by", "user"][attr_name] = index.flip([0])
+
+            if CONFIG.bidirectional:
+                if attr_name == "edge_index":
+                    self.data["item", "rated_by", "user"][attr_name] = index.flip([0])
 
 
 class Attention(nn.Module):

@@ -43,17 +43,10 @@ def get_mm_embeddings_single_branch(pretrained_modality_embeddings):
 def fuse_concat(stacked_embeddings):
     num_modalities = stacked_embeddings.shape[0]
 
-    concatenated_embeddings = torch.cat(
-        [stacked_embeddings[i] for i in range(num_modalities)], dim=-1
-    ).to(CONFIG.device)
+    projector = nn.LazyLinear(CONFIG.embedding_dim // num_modalities).to(CONFIG.device)
+    fused_embeddings = torch.cat([projector(emb) for emb in stacked_embeddings], dim=-1)
 
-    projector = nn.Linear(
-        num_modalities * CONFIG.embedding_dim, CONFIG.embedding_dim
-    ).to(CONFIG.device)
-
-    aggregated_embeddings = projector(concatenated_embeddings)
-
-    return aggregated_embeddings
+    return fused_embeddings
 
 
 def fuse_mean(stacked_embeddings):
@@ -98,27 +91,19 @@ class Base_MMLGCN(LightGCN):
         **kwargs,
     ):
         super().__init__(num_nodes, CONFIG.embedding_dim, num_layers, alpha, **kwargs)
-        pt_mm_emb = [
-            F.normalize(emb) for emb in pretrained_modality_embeddings.values()
-        ]
+        embs = [F.normalize(emb) for emb in pretrained_modality_embeddings.values()]
 
-        self.mm_embeddings = [
-            emb.to(CONFIG.device) for emb in emb_fn[CONFIG.single_branch](pt_mm_emb)
-        ]
+        self.mm_embeddings = emb_fn[CONFIG.single_branch](embs)
 
         self.num_items = len(self.mm_embeddings[0])
         self.num_users = num_nodes - self.num_items
         self.fuse = fusion_fn[CONFIG.fusion_modalities]
 
         self.encoder = nn.Sequential(
-            nn.LazyLinear(CONFIG.embedding_dim // 4),
-            nn.ReLU(),
             nn.LazyLinear(CONFIG.embedding_dim // 2),
             nn.ReLU(),
         )
         self.decoder = nn.Sequential(
-            nn.LazyLinear(CONFIG.embedding_dim // 2),
-            nn.ReLU(),
             nn.LazyLinear(CONFIG.embedding_dim),
             nn.ReLU(),
         )
@@ -130,10 +115,14 @@ class Base_MMLGCN(LightGCN):
         item_emb = lgcn_emb[self.num_users :]
 
         return user_emb, item_emb
-    
-    def recommendation_loss(self, pos_edge_rank, neg_edge_rank, node_id = None, lambda_reg = 0.0001, **kwargs):
-        loss = super().recommendation_loss(pos_edge_rank, neg_edge_rank, node_id, lambda_reg, **kwargs)
-        
+
+    def recommendation_loss(
+        self, pos_edge_rank, neg_edge_rank, node_id=None, lambda_reg=0.0001, **kwargs
+    ):
+        loss = super().recommendation_loss(
+            pos_edge_rank, neg_edge_rank, node_id, lambda_reg, **kwargs
+        )
+
         if CONFIG.autoencoder:
             mse_loss = 0
 
@@ -202,9 +191,11 @@ class LF_MMLGCN(Base_MMLGCN):
     def get_embedding(self, edge_index, edge_weight=None):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
 
-        fused_emb = torch.stack([item_emb, *[emb.weight for emb in self.mm_embeddings]])
+        stacked_item_emb = torch.stack(
+            [item_emb, *[emb.weight for emb in self.mm_embeddings]]
+        )
 
-        final_item_emb = self.fuse(fused_emb)
+        final_item_emb = self.fuse(stacked_item_emb)
 
         return torch.cat([user_emb, final_item_emb], dim=0)
 
@@ -293,7 +284,9 @@ class EMF_MMLGCN(Base_MMLGCN):
             [f(stacked_embeddings) for f in fusion_fn.values()]
         )
 
-        projector = nn.Sequential(nn.LazyLinear(CONFIG.embedding_dim // len(fusion_fn))).to(CONFIG.device)
+        projector = nn.Sequential(
+            nn.LazyLinear(CONFIG.embedding_dim // len(fusion_fn))
+        ).to(CONFIG.device)
         projected = torch.cat([projector(emb) for emb in fused_mm_embeddings], dim=-1)
 
         final_projector = nn.LazyLinear(CONFIG.embedding_dim).to(CONFIG.device)
