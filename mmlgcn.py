@@ -127,6 +127,7 @@ class Base_MMLGCN(LightGCN):
             mse_loss = 0
 
             for mod in self.mm_embeddings:
+                mod = mod.to(CONFIG.device)
                 encoded = self.encoder(mod)
                 decoded = self.decoder(encoded)
 
@@ -242,7 +243,7 @@ class LMF_MMLGCN(Base_MMLGCN):
             num_nodes, num_layers, pretrained_modality_embeddings, alpha, **kwargs
         )
 
-        stacked_embeddings = torch.stack(self.mm_embeddings)
+        stacked_embeddings = torch.stack(self.mm_embeddings).to(CONFIG.device)
 
         self.fused_mm_embeddings = [
             nn.Embedding.from_pretrained(
