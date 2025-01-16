@@ -5,7 +5,7 @@ from tabulate import tabulate
 from datetime import datetime
 import random
 
-from utils import train, test, CONFIG, MMDataset, print_config
+from utils import train, test, CONFIG, MMDataset, print_config, EarlyStop
 from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN, EMF_MMLGCN, LMF_MMLGCN
 
 torch.manual_seed(CONFIG.seed)
@@ -64,6 +64,8 @@ def main():
 
     print_config()
 
+    early_stop = EarlyStop(CONFIG.early_stop_window, CONFIG.early_stop_threshold)
+
     for epoch in range(CONFIG.epochs):
         loss = train(
             train_loader,
@@ -87,6 +89,9 @@ def main():
 
         print(tabulate([headers, metrics], tablefmt="plain"))
         print()
+
+        if early_stop.is_stop([l[1] for l in out[2:]]):
+            break
 
     if CONFIG.log:
         dt = datetime.now().replace(microsecond=0).isoformat()

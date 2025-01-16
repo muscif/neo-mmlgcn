@@ -9,10 +9,12 @@ model = "ef-mmlgcn"
 fusion_modalities = "mean"
 top_k = [5, 10, 20, 50]
 seed = 19
-autoencoder = false
+autoencoder = true
 multimodal = true
 single_branch = false
 bidirectional = false
+early_stop_window = 50
+early_stop_threshold = 0.05
 freeze = true
 log = true
 
