@@ -6,20 +6,19 @@ from datetime import datetime
 import random
 
 from utils import train, test, CONFIG, MMDataset, print_config, EarlyStop
-from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN, EMF_MMLGCN, LMF_MMLGCN
+from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
-torch.manual_seed(CONFIG.seed)
-random.seed(CONFIG.seed)
-
-models = {
-    "ef-mmlgcn": EF_MMLGCN,
-    "lf-mmlgcn": LF_MMLGCN,
-    "if-mmlgcn": IF_MMLGCN,
-    "emf-mmlgcn": EMF_MMLGCN,
-    "lmf-mmlgcn": LMF_MMLGCN,
-}
 
 def main():
+    torch.manual_seed(CONFIG.seed)
+    random.seed(CONFIG.seed)
+
+    models = {
+        "ef-mmlgcn": EF_MMLGCN,
+        "lf-mmlgcn": LF_MMLGCN,
+        "if-mmlgcn": IF_MMLGCN,
+    }
+
     Model = models[CONFIG.model]
 
     dataset = MMDataset()
@@ -51,7 +50,9 @@ def main():
             num_layers=CONFIG.n_layers,
         ).to(CONFIG.device)
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG.learning_rate, fused=True)
+    optimizer = torch.optim.Adam(
+        model.parameters(), lr=CONFIG.learning_rate, fused=True
+    )
 
     out = []
     out.append(CONFIG)
@@ -105,5 +106,6 @@ def main():
             for el in out[2:]:
                 fout.write(f"{'\t'.join([str(e) for e in el])}\n")
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()

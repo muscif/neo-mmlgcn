@@ -78,6 +78,11 @@ fusion_fn = {
     "prod": fuse_prod,
 }
 
+
+def fuse_ensemble(stacked_embeddings):
+    return torch.stack([f(stacked_embeddings) for f in fusion_fn.values()])
+
+
 emb_fn = {False: get_mm_embeddings, True: get_mm_embeddings_single_branch}
 
 
@@ -93,11 +98,21 @@ class Base_MMLGCN(LightGCN):
         super().__init__(num_nodes, CONFIG.embedding_dim, num_layers, alpha, **kwargs)
         embs = [F.normalize(emb) for emb in pretrained_modality_embeddings.values()]
 
-        self.mm_embeddings = emb_fn[CONFIG.single_branch](embs)
+        self.mm_embeddings = [
+            nn.Embedding.from_pretrained(emb, freeze=CONFIG.freeze).to(CONFIG.device)
+            for emb in emb_fn[CONFIG.single_branch](embs)
+        ]
 
-        self.num_items = len(self.mm_embeddings[0])
+        self.num_items = len(self.mm_embeddings[0].weight)
         self.num_users = num_nodes - self.num_items
         self.fuse = fusion_fn[CONFIG.fusion_modalities]
+
+        self.stacked_embeddings = torch.stack(
+            [emb.weight for emb in self.mm_embeddings]
+        ).to(CONFIG.device)
+
+        if CONFIG.ensemble_fusion:
+            self.stacked_embeddings = fuse_ensemble(self.stacked_embeddings)
 
         self.encoder = nn.Sequential(
             nn.LazyLinear(CONFIG.embedding_dim // 2),
@@ -151,13 +166,9 @@ class EF_MMLGCN(Base_MMLGCN):
             num_nodes, num_layers, pretrained_modality_embeddings, alpha, **kwargs
         )
 
-        stacked_embeddings = torch.stack(self.mm_embeddings).to(CONFIG.device)
-
-        fused_mm_embeddings = self.fuse(stacked_embeddings)
-
         self.fused_mm_embeddings = nn.Embedding.from_pretrained(
-            fused_mm_embeddings, freeze=CONFIG.freeze
-        )
+            self.fuse(self.stacked_embeddings), freeze=CONFIG.freeze
+        ).to(CONFIG.device)
 
     def get_embedding(self, edge_index, edge_weight=None):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
@@ -172,23 +183,6 @@ class EF_MMLGCN(Base_MMLGCN):
 
 
 class LF_MMLGCN(Base_MMLGCN):
-    def __init__(
-        self,
-        num_nodes,
-        num_layers,
-        pretrained_modality_embeddings,
-        alpha=None,
-        **kwargs,
-    ):
-        super().__init__(
-            num_nodes, num_layers, pretrained_modality_embeddings, alpha, **kwargs
-        )
-
-        self.mm_embeddings = [
-            nn.Embedding.from_pretrained(emb, freeze=CONFIG.freeze).to(CONFIG.device)
-            for emb in self.mm_embeddings
-        ]
-
     def get_embedding(self, edge_index, edge_weight=None):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
 
@@ -214,8 +208,7 @@ class IF_MMLGCN(Base_MMLGCN):
             num_nodes, num_layers, pretrained_modality_embeddings, alpha, **kwargs
         )
 
-        stacked_embeddings = torch.stack(self.mm_embeddings)
-        fused_mm_embeddings = self.fuse(stacked_embeddings)
+        fused_mm_embeddings = self.fuse(self.stacked_embeddings)
 
         emb = torch.cat(
             [
@@ -243,7 +236,9 @@ class LMF_MMLGCN(Base_MMLGCN):
             num_nodes, num_layers, pretrained_modality_embeddings, alpha, **kwargs
         )
 
-        stacked_embeddings = torch.stack(self.mm_embeddings).to(CONFIG.device)
+        stacked_embeddings = torch.stack([emb.weight for emb in self.mm_embeddings]).to(
+            CONFIG.device
+        )
 
         self.fused_mm_embeddings = [
             nn.Embedding.from_pretrained(
@@ -260,49 +255,6 @@ class LMF_MMLGCN(Base_MMLGCN):
         )
 
         final_item_emb = self.fuse(stacked_item_emb)
-
-        final_emb = torch.cat([user_emb, final_item_emb], dim=0)
-
-        return final_emb
-
-
-class EMF_MMLGCN(Base_MMLGCN):
-    def __init__(
-        self,
-        num_nodes,
-        num_layers,
-        pretrained_modality_embeddings,
-        alpha=None,
-        **kwargs,
-    ):
-        super().__init__(
-            num_nodes, num_layers, pretrained_modality_embeddings, alpha, **kwargs
-        )
-
-        stacked_embeddings = torch.stack(self.mm_embeddings)
-
-        fused_mm_embeddings = torch.stack(
-            [f(stacked_embeddings) for f in fusion_fn.values()]
-        )
-
-        projector = nn.Sequential(
-            nn.LazyLinear(CONFIG.embedding_dim // len(fusion_fn))
-        ).to(CONFIG.device)
-        projected = torch.cat([projector(emb) for emb in fused_mm_embeddings], dim=-1)
-
-        final_projector = nn.LazyLinear(CONFIG.embedding_dim).to(CONFIG.device)
-        projected = final_projector(projected)
-
-        self.fused_mm_embeddings = nn.Embedding.from_pretrained(
-            projected, freeze=CONFIG.freeze
-        )
-
-    def get_embedding(self, edge_index, edge_weight=None):
-        user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
-
-        stacked_embeddings = torch.stack([item_emb, self.fused_mm_embeddings.weight])
-
-        final_item_emb = self.fuse(stacked_embeddings)
 
         final_emb = torch.cat([user_emb, final_item_emb], dim=0)
 
