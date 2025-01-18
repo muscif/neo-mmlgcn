@@ -13,13 +13,13 @@ def main():
     torch.manual_seed(CONFIG.seed)
     random.seed(CONFIG.seed)
 
-    models = {
-        "ef-mmlgcn": EF_MMLGCN,
-        "lf-mmlgcn": LF_MMLGCN,
-        "if-mmlgcn": IF_MMLGCN,
+    fusion_types = {
+        "early": EF_MMLGCN,
+        "late": LF_MMLGCN,
+        "inner": IF_MMLGCN,
     }
 
-    Model = models[CONFIG.model]
+    Model = fusion_types[CONFIG.fusion_type]
 
     dataset = MMDataset()
     hdata = dataset.data
