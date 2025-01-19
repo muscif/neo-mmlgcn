@@ -1,22 +1,22 @@
-n_layers = 2
-device = "cuda"
 batch_size = 2048
-embedding_dim = 1024
 learning_rate = 0.001
 dataset = "dbbook"
 epochs = 1000
-fusion_type = "early"
-fusion_modalities = "mean"
 top_k = [5, 10, 20, 50]
 seed = 19
+early_stop_window = 50
+early_stop_threshold = 0.03
+log = false
+
+n_layers = 2
+embedding_dim = 1024
+fusion_type = "early"
+fusion_modalities = "prod"
 autoencoder = false
 multimodal = true
 single_branch = false
 bidirectional = false
-early_stop_window = 50
-early_stop_threshold = 0.03
 freeze = true
-log = false
 ensemble_fusion = true
 
 [datasets]

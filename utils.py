@@ -18,10 +18,10 @@ class Config:
         with open(config_path, "r") as file:
             config_data = toml.load(file)
 
+        setattr(self, "device", None)
+
         for key, value in config_data.items():
             setattr(self, key, value)
-
-        torch.device(self.device)
 
     def __repr__(self):
         return json.dumps(self.__dict__)

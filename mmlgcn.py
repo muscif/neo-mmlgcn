@@ -41,10 +41,9 @@ def get_mm_embeddings_single_branch(pretrained_modality_embeddings):
 
 
 def fuse_concat(stacked_embeddings):
-    num_modalities = stacked_embeddings.shape[0]
-
-    projector = nn.LazyLinear(CONFIG.embedding_dim // num_modalities).to(CONFIG.device)
-    fused_embeddings = torch.cat([projector(emb) for emb in stacked_embeddings], dim=-1)
+    conc = torch.cat([emb for emb in stacked_embeddings], dim=-1)
+    projector = nn.LazyLinear(CONFIG.embedding_dim)
+    fused_embeddings = projector(conc)
 
     return fused_embeddings
 
@@ -99,7 +98,7 @@ class Base_MMLGCN(LightGCN):
         embs = [F.normalize(emb) for emb in pretrained_modality_embeddings.values()]
 
         self.mm_embeddings = [
-            nn.Embedding.from_pretrained(emb, freeze=CONFIG.freeze).to(CONFIG.device)
+            nn.Embedding.from_pretrained(emb, freeze=CONFIG.freeze)
             for emb in emb_fn[CONFIG.single_branch](embs)
         ]
 
@@ -109,7 +108,7 @@ class Base_MMLGCN(LightGCN):
 
         self.stacked_embeddings = torch.stack(
             [emb.weight for emb in self.mm_embeddings]
-        ).to(CONFIG.device)
+        )
 
         if CONFIG.ensemble_fusion:
             self.stacked_embeddings = fuse_ensemble(self.stacked_embeddings)
@@ -142,7 +141,6 @@ class Base_MMLGCN(LightGCN):
             mse_loss = 0
 
             for mod in self.mm_embeddings:
-                mod = mod.to(CONFIG.device)
                 encoded = self.encoder(mod)
                 decoded = self.decoder(encoded)
 
@@ -168,7 +166,7 @@ class EF_MMLGCN(Base_MMLGCN):
 
         self.fused_mm_embeddings = nn.Embedding.from_pretrained(
             self.fuse(self.stacked_embeddings), freeze=CONFIG.freeze
-        ).to(CONFIG.device)
+        )
 
     def get_embedding(self, edge_index, edge_weight=None):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
@@ -212,8 +210,8 @@ class IF_MMLGCN(Base_MMLGCN):
 
         emb = torch.cat(
             [
-                self.embedding.weight[: self.num_users].to(CONFIG.device),
-                fused_mm_embeddings.to(CONFIG.device),
+                self.embedding.weight[: self.num_users],
+                fused_mm_embeddings,
             ]
         )
 

@@ -1,6 +1,7 @@
 import torch
 from torch_geometric.nn import LightGCN
 from tabulate import tabulate
+import GPUtil
 
 from datetime import datetime
 import random
@@ -10,6 +11,11 @@ from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
 
 def main():
+    gpu_id = GPUtil.getAvailable(order="memory", limit=10)[0]
+
+    CONFIG.device = f"cuda:{gpu_id}"
+
+    torch.cuda.manual_seed(CONFIG.seed)
     torch.manual_seed(CONFIG.seed)
     random.seed(CONFIG.seed)
 
@@ -31,10 +37,14 @@ def main():
     # Use all message passing edges as training labels
     mask = data.edge_index[0] < data.edge_index[1]
     train_edge_label_index = data.edge_index[:, mask]
+    
+    size = train_edge_label_index.size(1)
     train_loader = torch.utils.data.DataLoader(
-        range(train_edge_label_index.size(1)),
+        range(size),
         shuffle=True,
         batch_size=CONFIG.batch_size,
+        pin_memory=True,
+        pin_memory_device=CONFIG.device
     )
 
     if CONFIG.multimodal:
@@ -100,11 +110,11 @@ def main():
             conf = out[0]
             header = out[1]
 
-            fout.write(f"{conf}\n")
-            fout.write(f"{'\t'.join(header)}\n")
+            fout.write(str(conf) + "\n")
+            fout.write('\t'.join(header) + "\n")
 
             for el in out[2:]:
-                fout.write(f"{'\t'.join([str(e) for e in el])}\n")
+                fout.write('\t'.join([str(e) for e in el]) + "\n")
 
 
 if __name__ == "__main__":
