@@ -11,7 +11,7 @@ from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
 
 def main():
-    gpu_id = GPUtil.getAvailable(order="memory", limit=10)[0]
+    gpu_id = GPUtil.getAvailable(order="memory", limit=10, maxLoad=1, maxMemory=1)[0]
 
     CONFIG.device = f"cuda:{gpu_id}"
 

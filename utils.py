@@ -96,8 +96,8 @@ class MMDataset:
 class Attention(nn.Module):
     def __init__(self, embedding_dim, attention_dim):
         super().__init__()
-        self.kq = nn.Linear(embedding_dim, attention_dim).to(CONFIG.device)
-        self.v = nn.Linear(embedding_dim, embedding_dim).to(CONFIG.device)
+        self.kq = nn.Linear(embedding_dim, attention_dim, device=CONFIG.device)
+        self.v = nn.Linear(embedding_dim, embedding_dim, device=CONFIG.device)
 
     def forward(self, q, k, v):
         q = self.kq(q)
@@ -133,7 +133,7 @@ class EarlyStop:
             slope, _ = Polynomial.fit(self.x, l[-self.window:], 1)
             return abs(slope) < self.threshold
 
-@torch.compile
+
 def train(
     train_loader, train_edge_label_index, num_users, num_items, optimizer, model, data
 ):
