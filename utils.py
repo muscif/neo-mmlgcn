@@ -2,6 +2,7 @@ import json
 import os.path as osp
 
 import numpy as np
+from numpy.polynomial import Polynomial
 import toml
 import torch
 import torch.nn as nn
@@ -129,8 +130,7 @@ class EarlyStop:
 
     def is_stop(self, l):
         if len(l) > self.window:
-            slope, _ = np.polyfit(self.x, l[-self.window:], 1)
-            print(slope)
+            slope, _ = Polynomial.fit(self.x, l[-self.window:], 1)
             return abs(slope) < self.threshold
 
 def train(
