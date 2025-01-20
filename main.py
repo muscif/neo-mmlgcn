@@ -60,6 +60,9 @@ def main():
             num_layers=CONFIG.n_layers,
         ).to(CONFIG.device)
 
+    if torch.cuda.get_device_capability()[0] >= 7:
+        model = torch.compile(model)
+
     optimizer = torch.optim.Adam(
         model.parameters(), lr=CONFIG.learning_rate, fused=True
     )
