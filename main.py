@@ -6,7 +6,7 @@ import GPUtil
 from datetime import datetime
 import random
 
-from utils import train, test, validate, CONFIG, MMDataset, print_config, EarlyStop
+from utils import train, test, validate, CONFIG, MMDataset, print_config
 from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
 
@@ -47,7 +47,7 @@ def main():
     val_indices = shuffled_indices[num_train:]
     
     orig_train_edge_label_index = train_edge_label_index.clone()
-    #train_edge_label_index = orig_train_edge_label_index[:, train_indices]
+    train_edge_label_index = orig_train_edge_label_index[:, train_indices]
     val_edge_label_index = orig_train_edge_label_index[:, val_indices]
 
     # Create DataLoader for training and validation
@@ -98,9 +98,9 @@ def main():
 
     print_config()
 
-    early_stop = EarlyStop(CONFIG.early_stop_window, CONFIG.early_stop_threshold)
+    epochs = CONFIG.epochs + 100 * CONFIG.n_layers
 
-    for epoch in range(CONFIG.epochs):
+    for epoch in range(epochs):
         train_loss = train(
             train_loader,
             train_edge_label_index,
@@ -132,9 +132,6 @@ def main():
 
         print(tabulate([headers, metrics], tablefmt="plain"))
         print()
-
-        if early_stop.is_stop([l[1] for l in out[2:]]):
-            break
 
     if CONFIG.log:
         dt = datetime.now().replace(microsecond=0).isoformat()

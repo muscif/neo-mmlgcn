@@ -120,18 +120,7 @@ class SelfAttention(Attention):
 class CrossAttention(Attention):
     def forward(self, t1, t2):
         return super().forward(t1, t2, t2)
-
-
-class EarlyStop:
-    def __init__(self, window=20, threshold=0.01):
-        self.window = window
-        self.threshold = threshold
-        self.x = np.arange(window)
-
-    def is_stop(self, l):
-        if len(l) > self.window:
-            slope, _ = Polynomial.fit(self.x, l[-self.window:], 1)
-            return abs(slope) < self.threshold
+    
 
 @torch.compile
 def train(
