@@ -6,7 +6,7 @@ import GPUtil
 from datetime import datetime
 import random
 
-from utils import train, test, CONFIG, MMDataset, print_config, EarlyStop
+from utils import train, test, validate, CONFIG, MMDataset, print_config, EarlyStop
 from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
 
@@ -39,8 +39,28 @@ def main():
     train_edge_label_index = data.edge_index[:, mask]
     
     size = train_edge_label_index.size(1)
+
+    num_train = int(0.8 * size)
+
+    shuffled_indices = torch.randperm(size)
+    train_indices = shuffled_indices[:num_train]
+    val_indices = shuffled_indices[num_train:]
+    
+    orig_train_edge_label_index = train_edge_label_index.clone()
+    #train_edge_label_index = orig_train_edge_label_index[:, train_indices]
+    val_edge_label_index = orig_train_edge_label_index[:, val_indices]
+
+    # Create DataLoader for training and validation
     train_loader = torch.utils.data.DataLoader(
-        range(size),
+        range(train_edge_label_index.size(1)),
+        shuffle=True,
+        batch_size=CONFIG.batch_size,
+        pin_memory=True,
+        pin_memory_device=CONFIG.device,
+    )
+
+    val_loader = torch.utils.data.DataLoader(
+        range(val_edge_label_index.size(1)),
         shuffle=True,
         batch_size=CONFIG.batch_size,
         pin_memory=True,
@@ -69,7 +89,7 @@ def main():
 
     out = []
     out.append(CONFIG)
-    headers = ["Epoch", "Loss"]
+    headers = ["Epoch", "T-Loss", "V-Loss"]
 
     for k in CONFIG.top_k:
         headers.extend([f"Precision@{k}", f"Recall@{k}", f"NDCG@{k}"])
@@ -81,7 +101,7 @@ def main():
     early_stop = EarlyStop(CONFIG.early_stop_window, CONFIG.early_stop_threshold)
 
     for epoch in range(CONFIG.epochs):
-        loss = train(
+        train_loss = train(
             train_loader,
             train_edge_label_index,
             num_users,
@@ -91,9 +111,18 @@ def main():
             data,
         )
 
+        val_loss = validate(
+            val_loader,
+            val_edge_label_index,
+            num_users,
+            num_items,
+            model,
+            data
+        )
+
         res = test(model, data, num_users, train_edge_label_index)
 
-        metrics = [epoch + 1, round(loss.item(), 4)]
+        metrics = [epoch + 1, round(train_loss.item(), 4), round(val_loss.item(), 4)]
 
         for k in CONFIG.top_k:
             precision, recall, ndcg = res[k]

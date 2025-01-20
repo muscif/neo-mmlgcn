@@ -133,10 +133,11 @@ class EarlyStop:
             slope, _ = Polynomial.fit(self.x, l[-self.window:], 1)
             return abs(slope) < self.threshold
 
-
+@torch.compile
 def train(
     train_loader, train_edge_label_index, num_users, num_items, optimizer, model, data
 ):
+    model.train()
     total_loss = total_examples = 0
 
     for index in tqdm(train_loader):
@@ -173,6 +174,53 @@ def train(
         rec_loss.backward(retain_graph=True)
 
         optimizer.step()
+
+        numel = pos_rank.numel()
+
+        total_loss += rec_loss * numel
+        total_examples += numel
+
+    return total_loss / total_examples
+
+
+@torch.compile
+@torch.no_grad()
+def validate(
+    train_loader, train_edge_label_index, num_users, num_items, model, data
+):
+    model.eval()
+    total_loss = total_examples = 0
+
+    for index in tqdm(train_loader):
+        # Sample positive and negative labels.
+        pos_edge_label_index = train_edge_label_index[:, index]
+        neg_edge_label_index = torch.stack(
+            [
+                pos_edge_label_index[0],
+                torch.randint(
+                    num_users,
+                    num_users + num_items,
+                    (index.numel(),),
+                    device=CONFIG.device,
+                ),
+            ],
+            dim=0,
+        )
+        edge_label_index = torch.cat(
+            [
+                pos_edge_label_index,
+                neg_edge_label_index,
+            ],
+            dim=1,
+        )
+
+        pos_rank, neg_rank = model(data.edge_index, edge_label_index).chunk(2)
+
+        rec_loss = model.recommendation_loss(
+            pos_rank,
+            neg_rank,
+            node_id=edge_label_index.unique(),
+        )
 
         numel = pos_rank.numel()
 
