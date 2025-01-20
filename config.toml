@@ -4,20 +4,20 @@ dataset = "dbbook"
 epochs = 1000
 top_k = [5, 10, 20, 50]
 seed = 19
-early_stop_window = 50
-early_stop_threshold = 0.03
-log = false
+early_stop_window = 20
+early_stop_threshold = 1e-6
+log = true
 
-n_layers = 2
-embedding_dim = 1024
+n_layers = 4
+embedding_dim = 256
 fusion_type = "early"
-fusion_modalities = "prod"
+fusion_modalities = "mean"
 autoencoder = false
-multimodal = true
+multimodal = false
 single_branch = false
 bidirectional = false
 freeze = true
-ensemble_fusion = true
+ensemble_fusion = false
 
 [datasets]
 dbbook = ["images", "text"]

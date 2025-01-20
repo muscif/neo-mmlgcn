@@ -9,8 +9,6 @@ from torch_geometric.data import HeteroData
 from torch_geometric.utils import degree
 from tqdm import tqdm
 from tabulate import tabulate
-from scipy.stats import variation
-from dataclasses import dataclass
 
 
 class Config:
@@ -123,16 +121,17 @@ class CrossAttention(Attention):
         return super().forward(t1, t2, t2)
 
 
-@dataclass
 class EarlyStop:
-    window: int = 20
-    threshold: float = 0.01
+    def __init__(self, window=20, threshold=0.01):
+        self.window = window
+        self.threshold = threshold
+        self.x = np.arange(window)
 
     def is_stop(self, l):
         if len(l) > self.window:
-            v = variation(l[-self.window:])
-            print(v)
-            return v < self.threshold
+            slope, _ = np.polyfit(self.x, l[-self.window:], 1)
+            print(slope)
+            return abs(slope) < self.threshold
 
 def train(
     train_loader, train_edge_label_index, num_users, num_items, optimizer, model, data
