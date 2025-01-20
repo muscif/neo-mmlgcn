@@ -41,8 +41,8 @@ def get_mm_embeddings_single_branch(pretrained_modality_embeddings):
 
 
 def fuse_concat(stacked_embeddings):
-    conc = torch.cat([emb for emb in stacked_embeddings], dim=-1)
-    projector = nn.LazyLinear(CONFIG.embedding_dim)
+    conc = torch.cat([emb for emb in stacked_embeddings], dim=-1).to(CONFIG.device)
+    projector = nn.LazyLinear(CONFIG.embedding_dim).to(CONFIG.device)
     fused_embeddings = projector(conc)
 
     return fused_embeddings
@@ -98,7 +98,7 @@ class Base_MMLGCN(LightGCN):
         embs = [F.normalize(emb) for emb in pretrained_modality_embeddings.values()]
 
         self.mm_embeddings = [
-            nn.Embedding.from_pretrained(emb, freeze=CONFIG.freeze)
+            nn.Embedding.from_pretrained(emb, freeze=CONFIG.freeze).to(CONFIG.device)
             for emb in emb_fn[CONFIG.single_branch](embs)
         ]
 
