@@ -6,7 +6,7 @@ import GPUtil
 from datetime import datetime
 import random
 
-from utils import train, test, validate, CONFIG, MMDataset, print_config
+from utils import train, test, validate, CONFIG, print_config, load_dataset, load_embeddings
 from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
 
@@ -27,16 +27,14 @@ def main():
 
     Model = fusion_types[CONFIG.fusion_type]
 
-    dataset = MMDataset()
-    hdata = dataset.data
+    hdata = load_dataset(f"./data/{CONFIG.dataset}")
+    embeddings = load_embeddings(f"./data/{CONFIG.dataset}")
 
     num_users = hdata["user"].num_nodes
     num_items = hdata["item"].num_nodes
     data = hdata.to_homogeneous().to(CONFIG.device)
 
-    # Use all message passing edges as training labels
-    mask = data.edge_index[0] < data.edge_index[1]
-    train_edge_label_index = data.edge_index[:, mask]
+    train_edge_label_index = data.edge_index
     
     size = train_edge_label_index.size(1)
 
@@ -71,7 +69,7 @@ def main():
         model = Model(
             num_nodes=data.num_nodes,
             num_layers=CONFIG.n_layers,
-            pretrained_modality_embeddings=dataset.embeddings,
+            pretrained_modality_embeddings=embeddings,
         ).to(CONFIG.device)
     else:
         model = LightGCN(

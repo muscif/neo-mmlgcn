@@ -10,6 +10,7 @@ from torch_geometric.data import HeteroData
 from torch_geometric.utils import degree
 from tqdm import tqdm
 from tabulate import tabulate
+from dataclasses import dataclass
 
 
 class Config:
@@ -28,69 +29,67 @@ class Config:
 
 CONFIG = Config("config.toml")
 
+def load_embeddings(path):
+    embeddings = {}
 
-class MMDataset:
-    def __init__(self):
-        self.path = f"./data/{CONFIG.dataset}"
+    for modality in CONFIG.datasets[CONFIG.dataset]:
+        emb = torch.from_numpy(np.load(f"{path}/{modality}/items.npy")).to(
+            torch.float
+        )
 
-        self.load_embeddings()
-        self.load_dataset()
+        embeddings[modality] = emb
 
-    def load_embeddings(self):
-        self.embeddings = {}
+    return embeddings
 
-        for modality in CONFIG.datasets[CONFIG.dataset]:
-            emb = torch.from_numpy(np.load(f"{self.path}/{modality}/items.npy")).to(
-                torch.float
-            )
+def load_dataset(path):
+    def transform(line):
+        t = line.strip().split(" ")
+        user, *items = t
 
-            self.embeddings[modality] = emb
+        return user, items
+    
+    def create_edge_index(interactions):
+        rows, cols = [], []
+        for user, items in interactions:
+            for item in items:
+                rows.append(int(user))
+                cols.append(int(item))
 
-    def load_dataset(self):
-        def transform(line):
-            t = line.strip().split(" ")
-            user, *items = t
+        edge_index = torch.tensor([rows, cols]) 
 
-            return user, items
+        return edge_index
 
-        train_file = osp.join(self.path, "train.txt")
-        test_file = osp.join(self.path, "test.txt")
+    train_file = osp.join(path, "train.txt")
+    test_file = osp.join(path, "test.txt")
 
-        self.data = HeteroData()
-        with (
-            open(train_file, "r", encoding="utf-8") as fin_train,
-            open(test_file, "r", encoding="utf-8") as fin_test,
-        ):
-            train = [transform(line) for line in fin_train]
-            test = [transform(line) for line in fin_test]
+    
+    with (
+        open(train_file, "r", encoding="utf-8") as fin_train,
+        open(test_file, "r", encoding="utf-8") as fin_test,
+    ):
+        train = [transform(line) for line in fin_train]
+        test = [transform(line) for line in fin_test]
 
-        items = set()
-        users = set()
-        for user, its in train + test:
-            users.add(user)
+    items = set()
+    users = set()
+    for user, its in train + test:
+        users.add(user)
 
-            for it in its:
-                items.add(it)
+        for it in its:
+            items.add(it)
 
-        self.data["user"].num_nodes = len(users)
-        self.data["item"].num_nodes = len(items)
+    data = HeteroData()
 
-        # Process edge information for training and testing:
-        attr_names = ["edge_index", "edge_label_index"]
-        for portion, attr_name in zip([train, test], attr_names):
-            rows, cols = [], []
+    data["user"].num_nodes = len(users)
+    data["item"].num_nodes = len(items)
 
-            for user, items in portion:
-                for dst in items:
-                    rows.append(int(user))
-                    cols.append(int(dst))
-            index = torch.tensor([rows, cols])
+    edge_index = create_edge_index(train)
+    edge_label_index = create_edge_index(test)
 
-            self.data["user", "rates", "item"][attr_name] = index
+    data["user", "rates", "item"].edge_index = edge_index
+    data["user", "rates", "item"].edge_label_index = edge_label_index
 
-            if CONFIG.bidirectional:
-                if attr_name == "edge_index":
-                    self.data["item", "rated_by", "user"][attr_name] = index.flip([0])
+    return data
 
 
 class Attention(nn.Module):
