@@ -133,6 +133,7 @@ class EarlyStop:
             slope, _ = Polynomial.fit(self.x, l[-self.window:], 1)
             return abs(slope) < self.threshold
 
+@torch.compile
 def train(
     train_loader, train_edge_label_index, num_users, num_items, optimizer, model, data
 ):
@@ -173,8 +174,10 @@ def train(
 
         optimizer.step()
 
-        total_loss += rec_loss.item() * pos_rank.numel()
-        total_examples += pos_rank.numel()
+        numel = pos_rank.numel()
+
+        total_loss += rec_loss * numel
+        total_examples += numel
 
     return total_loss / total_examples
 

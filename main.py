@@ -44,7 +44,7 @@ def main():
         shuffle=True,
         batch_size=CONFIG.batch_size,
         pin_memory=True,
-        pin_memory_device=CONFIG.device
+        pin_memory_device=CONFIG.device,
     )
 
     if CONFIG.multimodal:
@@ -93,7 +93,7 @@ def main():
 
         res = test(model, data, num_users, train_edge_label_index)
 
-        metrics = [epoch + 1, round(loss, 4)]
+        metrics = [epoch + 1, round(loss.item(), 4)]
 
         for k in CONFIG.top_k:
             precision, recall, ndcg = res[k]
