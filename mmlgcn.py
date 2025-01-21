@@ -113,6 +113,8 @@ class Base_MMLGCN(LightGCN):
         if CONFIG.ensemble_fusion:
             self.stacked_embeddings = fuse_ensemble(self.stacked_embeddings)
 
+        self.mm_weight = nn.Parameter(torch.tensor(1.0, device=CONFIG.device)) if CONFIG.alpha else 1
+
         self.encoder = nn.Sequential(
             nn.LazyLinear(CONFIG.embedding_dim // 2),
             nn.ReLU(),
@@ -167,7 +169,7 @@ class EF_MMLGCN(Base_MMLGCN):
         self.fused_mm_embeddings = nn.Embedding.from_pretrained(
             self.fuse(self.stacked_embeddings), freeze=CONFIG.freeze
         )
-
+    
     def get_embedding(self, edge_index, edge_weight=None):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
 
@@ -185,7 +187,7 @@ class LF_MMLGCN(Base_MMLGCN):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
 
         stacked_item_emb = torch.stack(
-            [item_emb, *[emb.weight for emb in self.mm_embeddings]]
+            [item_emb, *[emb.weight * self.mm_weight for emb in self.mm_embeddings]]
         )
 
         final_item_emb = self.fuse(stacked_item_emb)

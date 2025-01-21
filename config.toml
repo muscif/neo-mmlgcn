@@ -8,13 +8,14 @@ log = true
 
 n_layers = 2
 embedding_dim = 256
-fusion_type = "early"
-fusion_modalities = "mean"
+fusion_type = "late"
+fusion_modalities = "prod"
 autoencoder = false
 multimodal = true
 single_branch = false
 freeze = true
-ensemble_fusion = false
+ensemble_fusion = true
+alpha = false
 
 [datasets]
 dbbook = ["images", "text"]
