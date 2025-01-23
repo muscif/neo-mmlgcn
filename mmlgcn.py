@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import LightGCN
 import torch.nn.functional as F
+from functools import partial
 
 from utils import CONFIG
 
@@ -60,7 +61,17 @@ def fuse_prod(stacked_embeddings):
     return torch.prod(stacked_embeddings, dim=0)
 
 
+def fuse_concat(stacked_embeddings, layer):
+    concatenated = torch.cat([emb for emb in stacked_embeddings], dim=1).to(
+        CONFIG.device
+    )
+    reduced = layer(concatenated)
+
+    return reduced
+
+
 fusion_fn = {
+    "concat": fuse_concat,
     "mean": fuse_mean,
     "sum": fuse_sum,
     "max": fuse_max,
@@ -95,7 +106,12 @@ class Base_MMLGCN(LightGCN):
 
         self.num_items = len(self.mm_embeddings[0].weight)
         self.num_users = num_nodes - self.num_items
-        self.fuse = fusion_fn[CONFIG.fusion_modalities]
+
+        if CONFIG.fusion_modalities == "concat":
+            layer = nn.LazyLinear(CONFIG.embedding_dim, device=CONFIG.device)
+            self.fuse = partial(fuse_concat, layer=layer)
+        else:
+            self.fuse = fusion_fn[CONFIG.fusion_modalities]
 
         self.stacked_embeddings = torch.stack(
             [emb.weight for emb in self.mm_embeddings]
