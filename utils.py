@@ -2,7 +2,6 @@ import json
 import os.path as osp
 
 import numpy as np
-from numpy.polynomial import Polynomial
 import toml
 import torch
 import torch.nn as nn
@@ -10,7 +9,6 @@ from torch_geometric.data import HeteroData
 from torch_geometric.utils import degree
 from tqdm import tqdm
 from tabulate import tabulate
-from dataclasses import dataclass
 
 
 class Config:
@@ -70,21 +68,35 @@ def load_dataset(path):
         train = [transform(line) for line in fin_train]
         test = [transform(line) for line in fin_test]
 
-    items = set()
-    users = set()
-    for user, its in train + test:
-        users.add(user)
+    # PyG format: user IDs should range from (0, num_users) and item IDs should range from (num_users, num_users + num_items)
+    # https://github.com/pyg-team/pytorch_geometric/discussions/8788#discussioncomment-8197084
+    # This doesn't work, raises CUDA index error
 
-        for it in its:
-            items.add(it)
+    users = set(int(user) for user, _ in train + test)
+    items = set(int(item) for _, iteml in train + test for item in iteml)
 
+    users_remap = {user: i for i, user in enumerate(users)}
+    items_remap = {item: i for i, item in enumerate(items)}
+
+    train_remap = [
+        (users_remap[int(user)], [items_remap[int(item)] for item in iteml]) 
+        for user, iteml in train
+    ]
+
+    test_remap = [
+        (users_remap[int(user)], [items_remap[int(item)] for item in iteml]) 
+        for user, iteml in test
+    ]
+    
     data = HeteroData()
 
     data["user"].num_nodes = len(users)
     data["item"].num_nodes = len(items)
 
-    edge_index = create_edge_index(train)
-    edge_label_index = create_edge_index(test)
+    data.num_nodes = data["user"].num_nodes + data["item"].num_nodes
+
+    edge_index = create_edge_index(train_remap)
+    edge_label_index = create_edge_index(test_remap)
 
     data["user", "rates", "item"].edge_index = edge_index
     data["user", "rates", "item"].edge_label_index = edge_label_index
@@ -121,7 +133,6 @@ class CrossAttention(Attention):
         return super().forward(t1, t2, t2)
     
 
-@torch.compile
 def train(
     train_loader, train_edge_label_index, num_users, num_items, optimizer, model, data
 ):
@@ -151,7 +162,7 @@ def train(
             dim=1,
         )
 
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         pos_rank, neg_rank = model(data.edge_index, edge_label_index).chunk(2)
 
         rec_loss = model.recommendation_loss(
@@ -171,7 +182,6 @@ def train(
     return total_loss / total_examples
 
 
-@torch.compile
 @torch.no_grad()
 def validate(
     train_loader, train_edge_label_index, num_users, num_items, model, data
@@ -263,14 +273,14 @@ def test(model, data, num_users, train_edge_label_index):
 
             # Calculate NDCG
             num_relevant = torch.minimum(node_count, torch.tensor(k))
-            ideal_positions = torch.arange(k, device=logits.device)
+            ideal_positions = torch.arange(k, device=CONFIG.device)
             dcg_weights = 1 / torch.log2(ideal_positions + 2)
 
             dcg = (isin_mat * dcg_weights).sum(dim=-1)
 
             idcg = torch.zeros_like(dcg)
             mask = (
-                torch.arange(k, device=logits.device)[None, :] < num_relevant[:, None]
+                torch.arange(k, device=CONFIG.device)[None, :] < num_relevant[:, None]
             )
             idcg = (mask * dcg_weights[None, :]).sum(dim=1)
 
