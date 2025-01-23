@@ -1,22 +1,22 @@
-batch_size = 2048
+batch_size    = 2048
+dataset       = "dbbook"
+epochs        = 300
 learning_rate = 0.001
-dataset = "dbbook"
-epochs = 100
-top_k = [5, 10, 20, 50]
-seed = 19
-log = true
+log           = true
+seed          = 19
+top_k         = [10, 20, 5, 50]
 
-n_layers = 2
-embedding_dim = 256
-fusion_type = "late"
-fusion_modalities = "prod"
-autoencoder = false
-multimodal = true
-single_branch = false
-freeze = true
-ensemble_fusion = true
-alpha = false
+alpha             = false
+autoencoder       = false
+embedding_dim     = 512
+ensemble_fusion   = false
+freeze            = true
+fusion_modalities = "mean"
+fusion_type       = "late"
+multimodal        = true
+n_layers          = 2
+single_branch     = false
 
 [datasets]
 dbbook = ["images", "text"]
-ml1m = ["audio", "images", "text", "video"]
+ml1m   = ["audio", "images", "text", "video"]
