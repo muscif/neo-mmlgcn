@@ -6,7 +6,15 @@ import GPUtil
 from datetime import datetime
 import random
 
-from utils import train, test, validate, CONFIG, print_config, load_dataset, load_embeddings
+from utils import (
+    train,
+    test,
+    validate,
+    CONFIG,
+    print_config,
+    load_dataset,
+    load_embeddings,
+)
 from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
 
@@ -35,7 +43,7 @@ def main():
     data = hdata.to_homogeneous().to(CONFIG.device)
 
     train_edge_label_index = data.edge_index
-    
+
     size = train_edge_label_index.size(1)
 
     num_train = int(0.8 * size)
@@ -43,7 +51,7 @@ def main():
     shuffled_indices = torch.randperm(size)
     train_indices = shuffled_indices[:num_train]
     val_indices = shuffled_indices[num_train:]
-    
+
     orig_train_edge_label_index = train_edge_label_index.clone()
     train_edge_label_index = orig_train_edge_label_index[:, train_indices]
     val_edge_label_index = orig_train_edge_label_index[:, val_indices]
@@ -96,7 +104,7 @@ def main():
 
     print_config()
 
-    epochs = CONFIG.epochs + 100 * CONFIG.n_layers
+    epochs = CONFIG.epochs
 
     for epoch in range(epochs):
         train_loss = train(
@@ -110,12 +118,7 @@ def main():
         )
 
         val_loss = validate(
-            val_loader,
-            val_edge_label_index,
-            num_users,
-            num_items,
-            model,
-            data
+            val_loader, val_edge_label_index, num_users, num_items, model, data
         )
 
         res = test(model, data, num_users, train_edge_label_index)
@@ -138,10 +141,10 @@ def main():
             header = out[1]
 
             fout.write(str(conf) + "\n")
-            fout.write('\t'.join(header) + "\n")
+            fout.write("\t".join(header) + "\n")
 
             for el in out[2:]:
-                fout.write('\t'.join([str(e) for e in el]) + "\n")
+                fout.write("\t".join([str(e) for e in el]) + "\n")
 
 
 if __name__ == "__main__":
