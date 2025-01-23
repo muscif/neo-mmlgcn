@@ -4,7 +4,6 @@ import os.path as osp
 import numpy as np
 import toml
 import torch
-import torch.nn as nn
 from torch_geometric.data import HeteroData
 from torch_geometric.utils import degree
 from tqdm import tqdm
@@ -102,35 +101,6 @@ def load_dataset(path):
     data["user", "rates", "item"].edge_label_index = edge_label_index
 
     return data
-
-
-class Attention(nn.Module):
-    def __init__(self, embedding_dim, attention_dim):
-        super().__init__()
-        self.kq = nn.Linear(embedding_dim, attention_dim, device=CONFIG.device)
-        self.v = nn.Linear(embedding_dim, embedding_dim, device=CONFIG.device)
-
-    def forward(self, q, k, v):
-        q = self.kq(q)
-        k = self.kq(k)
-        v = self.v(v)
-
-        scores = q @ torch.transpose(k, 1, 2)
-        scores = scores / (k.shape[2] ** 0.5)
-        scores = nn.functional.softmax(scores, dim=2)
-        scores = scores @ v
-
-        return scores.squeeze(1)
-
-
-class SelfAttention(Attention):
-    def forward(self, q):
-        return super().forward(q, q, q)
-
-
-class CrossAttention(Attention):
-    def forward(self, t1, t2):
-        return super().forward(t1, t2, t2)
     
 
 def train(
