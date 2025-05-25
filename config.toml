@@ -1,20 +1,22 @@
 batch_size    = 2048
 dataset       = "dbbook"
-epochs        = 300
+epochs        = 500
 learning_rate = 0.001
-log           = true
+log           = false
 seed          = 19
-top_k         = [10, 20, 5, 50]
+top_k         = [5, 10, 20, 50]
 
 alpha             = false
 autoencoder       = false
 embedding_dim     = 512
 ensemble_fusion   = false
-freeze            = true
+freeze            = false
 fusion_modalities = "mean"
 fusion_type       = "late"
+info_nce          = false
 multimodal        = true
-n_layers          = 2
+normalized        = false
+n_layers          = 0
 single_branch     = false
 
 [datasets]

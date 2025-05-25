@@ -104,9 +104,7 @@ def main():
 
     print_config()
 
-    epochs = CONFIG.epochs
-
-    for epoch in range(epochs):
+    for epoch in range(CONFIG.epochs):
         train_loss = train(
             train_loader,
             train_edge_label_index,
@@ -140,11 +138,17 @@ def main():
             conf = out[0]
             header = out[1]
 
-            fout.write(str(conf) + "\n")
+            if CONFIG.alpha:
+                fout.write(str(conf) + f"alpha: {model.weight}" + "\n")
+            else:
+                fout.write(str(conf) + "\n")
+
             fout.write("\t".join(header) + "\n")
 
             for el in out[2:]:
                 fout.write("\t".join([str(e) for e in el]) + "\n")
+
+    print_config()
 
 
 if __name__ == "__main__":

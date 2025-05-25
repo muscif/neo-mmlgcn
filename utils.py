@@ -140,7 +140,7 @@ def train(
             neg_rank,
             node_id=edge_label_index.unique(),
         )
-        rec_loss.backward(retain_graph=True)
+        rec_loss.backward()
 
         optimizer.step()
 

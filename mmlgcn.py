@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch_geometric.nn import LightGCN
+from info_nce import InfoNCE
 import torch.nn.functional as F
 from functools import partial
 
@@ -113,15 +114,13 @@ class Base_MMLGCN(LightGCN):
         else:
             self.fuse = fusion_fn[CONFIG.fusion_modalities]
 
-        self.stacked_embeddings = torch.stack(
-            [emb.weight for emb in self.mm_embeddings]
-        )
-
         if CONFIG.ensemble_fusion:
-            self.stacked_embeddings = fuse_ensemble(self.stacked_embeddings)
+            self.stacked_embeddings = fuse_ensemble(
+                torch.stack([mm_emb.weight for mm_emb in self.mm_embeddings])
+            )
 
         self.mm_weight = (
-            nn.Parameter(torch.tensor(1.0, device=CONFIG.device)) if CONFIG.alpha else 1
+            nn.Parameter(torch.tensor(0.0, device=CONFIG.device)) if CONFIG.alpha else 1
         )
 
         self.encoder = nn.Sequential(
@@ -132,6 +131,8 @@ class Base_MMLGCN(LightGCN):
             nn.LazyLinear(CONFIG.embedding_dim),
             nn.ReLU(),
         )
+
+        self.info_nce_loss = InfoNCE()
 
     def get_embedding(self, edge_index, edge_weight=None):
         lgcn_emb = super().get_embedding(edge_index, edge_weight)
@@ -152,13 +153,20 @@ class Base_MMLGCN(LightGCN):
             mse_loss = 0
 
             for mod in self.mm_embeddings:
-                mod = mod.weight
-                encoded = self.encoder(mod)
+                mod_weight = mod.weight
+                encoded = self.encoder(mod_weight)
                 decoded = self.decoder(encoded)
 
-                mse_loss += F.mse_loss(mod, decoded)
+                mse_loss += F.mse_loss(mod_weight, decoded)
 
-            loss += mse_loss * 200
+            loss += mse_loss * 300
+
+        if CONFIG.info_nce:
+            emb0, emb1 = self.mm_embeddings
+
+            info_nce_loss = self.info_nce_loss(emb0.weight, emb1.weight)
+
+            loss += info_nce_loss / 10
 
         return loss
 
@@ -176,15 +184,24 @@ class EF_MMLGCN(Base_MMLGCN):
             num_nodes, num_layers, pretrained_modality_embeddings, alpha, **kwargs
         )
 
+        self.mm_emb_list = nn.ModuleList(
+            [
+                nn.Embedding.from_pretrained(mm_emb.weight, freeze=CONFIG.freeze)
+                for mm_emb in self.mm_embeddings
+            ]
+        )
+        self.n_modalities = len(self.mm_emb_list)
+
+        stacked_embeddings = torch.stack([emb.weight for emb in self.mm_emb_list])
+
         self.fused_mm_embeddings = nn.Embedding.from_pretrained(
-            self.fuse(self.stacked_embeddings), freeze=CONFIG.freeze
+            self.fuse(stacked_embeddings), freeze=CONFIG.freeze
         )
 
     def get_embedding(self, edge_index, edge_weight=None):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
-
-        final_item_emb = fuse_mean(
-            torch.stack([item_emb, self.fused_mm_embeddings.weight * self.mm_weight])
+        final_item_emb = self.fuse(
+            torch.stack([item_emb, self.fused_mm_embeddings.weight])
         )
 
         final_emb = torch.cat([user_emb, final_item_emb], dim=0)
@@ -193,12 +210,49 @@ class EF_MMLGCN(Base_MMLGCN):
 
 
 class LF_MMLGCN(Base_MMLGCN):
+    def __init__(
+        self,
+        num_nodes,
+        num_layers,
+        pretrained_modality_embeddings,
+        alpha=None,
+        **kwargs,
+    ):
+        super().__init__(
+            num_nodes, num_layers, pretrained_modality_embeddings, alpha, **kwargs
+        )
+
+        self.mm_emb_list = nn.ModuleList(
+            [
+                nn.Embedding.from_pretrained(mm_emb.weight, freeze=CONFIG.freeze)
+                for mm_emb in self.mm_embeddings
+            ]
+        )
+
+        self.n_modalities = len(self.mm_emb_list)
+
     def get_embedding(self, edge_index, edge_weight=None):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
 
-        stacked_item_emb = torch.stack(
-            [item_emb, *[emb.weight * self.mm_weight for emb in self.mm_embeddings]]
-        )
+        if CONFIG.alpha:
+            alpha = F.normalize(self.mm_weight)
+            stacked_item_emb = torch.stack(
+                [
+                    item_emb * alpha,
+                    *[emb.weight * (1 - alpha) for emb in self.mm_emb_list],
+                ]
+            )
+        elif CONFIG.normalized:
+            stacked_item_emb = torch.stack(
+                [
+                    F.normalize(item_emb) * self.n_modalities,
+                    *[emb.weight for emb in self.mm_emb_list],
+                ]
+            )
+        else:
+            stacked_item_emb = torch.stack(
+                [item_emb, *[emb.weight for emb in self.mm_emb_list]]
+            )
 
         final_item_emb = self.fuse(stacked_item_emb)
 
