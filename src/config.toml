@@ -1,0 +1,25 @@
+# General
+multimodal = true
+embedding_dim = 512
+n_layers = 2
+epochs = 500
+learning_rate = 0.001
+log = true
+seed = 19
+top_k = [5, 10, 20, 50]
+dataset = "ml1m"
+batch_size = 4096
+
+# Multimodal settings
+alpha = false
+autoencoder = false
+ensemble_fusion = false
+freeze = true
+fusion_modalities = "mean"
+fusion_type = "late"
+info_nce = false
+weighting = false
+
+[datasets]
+dbbook = ["images", "text"]
+ml1m = ["audio", "images", "text", "video"]
