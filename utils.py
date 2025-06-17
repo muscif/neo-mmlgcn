@@ -26,17 +26,17 @@ class Config:
 
 CONFIG = Config("config.toml")
 
+
 def load_embeddings(path):
     embeddings = {}
 
     for modality in CONFIG.datasets[CONFIG.dataset]:
-        emb = torch.from_numpy(np.load(f"{path}/{modality}/items.npy")).to(
-            torch.float
-        )
+        emb = torch.from_numpy(np.load(f"{path}/{modality}/items.npy")).to(torch.float)
 
         embeddings[modality] = emb
 
     return embeddings
+
 
 def load_dataset(path):
     def transform(line):
@@ -44,7 +44,7 @@ def load_dataset(path):
         user, *items = t
 
         return user, items
-    
+
     def create_edge_index(interactions):
         rows, cols = [], []
         for user, items in interactions:
@@ -52,14 +52,13 @@ def load_dataset(path):
                 rows.append(int(user))
                 cols.append(int(item))
 
-        edge_index = torch.tensor([rows, cols]) 
+        edge_index = torch.tensor([rows, cols])
 
         return edge_index
 
     train_file = osp.join(path, "train.txt")
     test_file = osp.join(path, "test.txt")
 
-    
     with (
         open(train_file, "r", encoding="utf-8") as fin_train,
         open(test_file, "r", encoding="utf-8") as fin_test,
@@ -78,15 +77,15 @@ def load_dataset(path):
     items_remap = {item: i for i, item in enumerate(items)}
 
     train_remap = [
-        (users_remap[int(user)], [items_remap[int(item)] for item in iteml]) 
+        (users_remap[int(user)], [items_remap[int(item)] for item in iteml])
         for user, iteml in train
     ]
 
     test_remap = [
-        (users_remap[int(user)], [items_remap[int(item)] for item in iteml]) 
+        (users_remap[int(user)], [items_remap[int(item)] for item in iteml])
         for user, iteml in test
     ]
-    
+
     data = HeteroData()
 
     data["user"].num_nodes = len(users)
@@ -101,7 +100,7 @@ def load_dataset(path):
     data["user", "rates", "item"].edge_label_index = edge_label_index
 
     return data
-    
+
 
 def train(
     train_loader, train_edge_label_index, num_users, num_items, optimizer, model, data
@@ -153,15 +152,13 @@ def train(
 
 
 @torch.no_grad()
-def validate(
-    train_loader, train_edge_label_index, num_users, num_items, model, data
-):
+def validate(val_loader, val_edge_label_index, num_users, num_items, model, data):
     model.eval()
     total_loss = total_examples = 0
 
-    for index in tqdm(train_loader):
+    for index in tqdm(val_loader):
         # Sample positive and negative labels.
-        pos_edge_label_index = train_edge_label_index[:, index]
+        pos_edge_label_index = val_edge_label_index[:, index]
         neg_edge_label_index = torch.stack(
             [
                 pos_edge_label_index[0],
@@ -199,8 +196,8 @@ def validate(
 
 
 @torch.no_grad()
-def test(model, data, num_users, train_edge_label_index):
-    emb = model.get_embedding(data.edge_index)
+def test(model, num_users, train_edge_index, test_edge_label_index, full_train_edge_index):
+    emb = model.get_embedding(train_edge_index)
     user_emb, item_emb = emb[:num_users], emb[num_users:]
     res = {}
 
@@ -212,25 +209,39 @@ def test(model, data, num_users, train_edge_label_index):
             logits = user_emb[start:end] @ item_emb.t()
 
             # Exclude training edges
-            mask = (train_edge_label_index[0] >= start) & (
-                train_edge_label_index[0] < end
-            )
+            #mask = (train_edge_index[0] >= start) & (train_edge_index[0] < end)
+            #logits[
+            #    train_edge_index[0, mask] - start,
+            #    train_edge_index[1, mask] - num_users,
+            #] = float("-inf")
+
+            # Exclude training edges (use full training set, not just the split)
+            mask = (full_train_edge_index[0] >= start) & (full_train_edge_index[0] < end)
             logits[
-                train_edge_label_index[0, mask] - start,
-                train_edge_label_index[1, mask] - num_users,
+                full_train_edge_index[0, mask] - start,
+                full_train_edge_index[1, mask] - num_users,
             ] = float("-inf")
 
             # Computing ground truth
+            #ground_truth = torch.zeros_like(logits, dtype=torch.bool)
+            #mask = (data.edge_label_index[0] >= start) & (
+            #    data.edge_label_index[0] < end
+            #)
+            #ground_truth[
+            #    data.edge_label_index[0, mask] - start,
+            #    data.edge_label_index[1, mask] - num_users,
+            #] = True
+
+            # Evaluate against test set
             ground_truth = torch.zeros_like(logits, dtype=torch.bool)
-            mask = (data.edge_label_index[0] >= start) & (
-                data.edge_label_index[0] < end
-            )
+            mask = (test_edge_label_index[0] >= start) & (test_edge_label_index[0] < end)
             ground_truth[
-                data.edge_label_index[0, mask] - start,
-                data.edge_label_index[1, mask] - num_users,
+                test_edge_label_index[0, mask] - start,
+                test_edge_label_index[1, mask] - num_users,
             ] = True
+
             node_count = degree(
-                data.edge_label_index[0, mask] - start, num_nodes=logits.size(0)
+                test_edge_label_index[0, mask] - start, num_nodes=logits.size(0)
             )
 
             # Get top-k predictions

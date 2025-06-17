@@ -42,23 +42,22 @@ def main():
     num_items = hdata["item"].num_nodes
     data = hdata.to_homogeneous().to(CONFIG.device)
 
-    train_edge_label_index = data.edge_index
+    train_edge_index = data.edge_index
+    test_edge_label_index = data.edge_label_index
 
-    size = train_edge_label_index.size(1)
-
+    size = train_edge_index.size(1)
     num_train = int(0.8 * size)
-
     shuffled_indices = torch.randperm(size)
     train_indices = shuffled_indices[:num_train]
     val_indices = shuffled_indices[num_train:]
 
-    orig_train_edge_label_index = train_edge_label_index.clone()
-    train_edge_label_index = orig_train_edge_label_index[:, train_indices]
-    val_edge_label_index = orig_train_edge_label_index[:, val_indices]
+    full_train_edge_index = train_edge_index.clone()
+    train_edge_index = full_train_edge_index[:, train_indices]
+    val_edge_label_index = full_train_edge_index[:, val_indices]
 
     # Create DataLoader for training and validation
     train_loader = torch.utils.data.DataLoader(
-        range(train_edge_label_index.size(1)),
+        range(train_edge_index.size(1)),
         shuffle=True,
         batch_size=CONFIG.batch_size,
         pin_memory=True,
@@ -107,7 +106,7 @@ def main():
     for epoch in range(CONFIG.epochs):
         train_loss = train(
             train_loader,
-            train_edge_label_index,
+            train_edge_index,
             num_users,
             num_items,
             optimizer,
@@ -119,7 +118,7 @@ def main():
             val_loader, val_edge_label_index, num_users, num_items, model, data
         )
 
-        res = test(model, data, num_users, train_edge_label_index)
+        res = test(model, num_users, train_edge_index, test_edge_label_index, full_train_edge_index)
 
         metrics = [epoch + 1, round(train_loss.item(), 4), round(val_loss.item(), 4)]
 
