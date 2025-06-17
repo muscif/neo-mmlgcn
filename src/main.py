@@ -140,7 +140,7 @@ def main():
         conf = out[0]
         header = out[1]
 
-        conf_hash = md5(bytes(str(conf))).hexdigest()
+        conf_hash = md5(bytes(str(conf), "utf-8")).hexdigest()
 
         with open(PATH_LOG / f"{conf_hash}.log", "w", encoding="utf-8") as fout:
             if CONFIG.alpha:
