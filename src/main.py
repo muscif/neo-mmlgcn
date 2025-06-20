@@ -21,9 +21,7 @@ from utils import (
 from mmlgcn import EF_MMLGCN, LF_MMLGCN, IF_MMLGCN
 
 
-def main():
-    gpu_id = GPUtil.getAvailable(order="memory", limit=10, maxLoad=1, maxMemory=1)[0]
-
+def main(gpu_id):
     CONFIG.device = f"cuda:{gpu_id}"
 
     torch.cuda.manual_seed(CONFIG.seed)
@@ -143,8 +141,8 @@ def main():
         conf_hash = md5(bytes(str(conf), "utf-8")).hexdigest()
 
         with open(PATH_LOG / f"{conf_hash}.log", "w", encoding="utf-8") as fout:
-            if CONFIG.alpha:
-                fout.write(str(conf) + f"alpha: {model.weight}" + "\n")
+            if CONFIG.weighting == "alpha":
+                fout.write(str(conf) + f"alpha: {model.weight}\n")
             else:
                 fout.write(str(conf) + "\n")
 
@@ -157,4 +155,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    gpu_id = GPUtil.getAvailable(order="memory", limit=10, maxLoad=1, maxMemory=1)[0]
+    main(gpu_id)

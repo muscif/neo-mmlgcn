@@ -1,26 +1,29 @@
 from utils import CONFIG
 from main import main
-import itertools
+import GPUtil
 
 if not CONFIG.log:
     raise Exception("Enable logging before continuing!")
 
-l_n_layers = [0,1,2,3]
-l_freeze = [False, True]
-l_weighting = [False, "alpha", "normalized", "equal"]
+gpu_id = GPUtil.getAvailable(order="memory", limit=10, maxLoad=1, maxMemory=1)[0]
 
-if True:
-    CONFIG.multimodal = False
-    for layer in l_n_layers:
-        CONFIG.n_layers = layer
+CONFIG.multimodal = False
+for n_layers in  [3, 2, 1, 0]:
+    CONFIG.n_layers = n_layers
 
-        main()
+    main(gpu_id)
 
-if True:
-    CONFIG.multimodal = True
-    for n_layers, freeze, weighting in itertools.product(l_n_layers, l_freeze, l_weighting):
-        CONFIG.n_layers = n_layers
+CONFIG.multimodal = True
+for n_layers in [3, 2, 1, 0]:
+    CONFIG.n_layers = n_layers
+    CONFIG.weighting = False
+
+    for freeze in [False, True]:
         CONFIG.freeze = freeze
-        CONFIG.weighting = weighting
+        main(gpu_id)
 
-        main()
+    CONFIG.freeze = freeze
+    for weighting in ["alpha", "normalized", "equal"]:
+        CONFIG.weighting = weighting
+        main(gpu_id)
+    

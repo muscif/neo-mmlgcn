@@ -1,20 +1,20 @@
 # General
 multimodal = true
-embedding_dim = 512
+embedding_dim = 256
 n_layers = 2
-epochs = 500
+epochs = 300
 learning_rate = 0.001
 log = true
 seed = 19
 top_k = [5, 10, 20, 50]
 dataset = "ml1m"
-batch_size = 4096
+batch_size = 8192
 
 # Multimodal settings
-alpha = false
+single_branch = false
 autoencoder = false
 ensemble_fusion = false
-freeze = true
+freeze = false
 fusion_modalities = "mean"
 fusion_type = "late"
 info_nce = false

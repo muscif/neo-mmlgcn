@@ -118,9 +118,7 @@ class Base_MMLGCN(LightGCN):
                 torch.stack([mm_emb.weight for mm_emb in self.mm_embeddings])
             )
 
-        self.mm_weight = (
-            nn.Parameter(torch.tensor(0.0, device=CONFIG.device)) if CONFIG.alpha else 1
-        )
+        self.mm_weight = nn.Parameter(torch.tensor(0.0, device=CONFIG.device)) if CONFIG.weighting == "alpha" else 1
 
         self.encoder = nn.Sequential(
             nn.LazyLinear(CONFIG.embedding_dim // 2),
@@ -193,14 +191,12 @@ class EF_MMLGCN(Base_MMLGCN):
 
         stacked_embeddings = torch.stack([emb.weight for emb in self.mm_emb_list])
 
-        self.fused_mm_embeddings = nn.Embedding.from_pretrained(
-            self.fuse(stacked_embeddings), freeze=CONFIG.freeze
-        )
+        self.fused_mm_embeddings = self.fuse(stacked_embeddings)
 
     def get_embedding(self, edge_index, edge_weight=None):
         user_emb, item_emb = super().get_embedding(edge_index, edge_weight)
         final_item_emb = self.fuse(
-            torch.stack([item_emb, self.fused_mm_embeddings.weight])
+            torch.stack([item_emb, self.fused_mm_embeddings])
         )
 
         final_emb = torch.cat([user_emb, final_item_emb], dim=0)
@@ -235,18 +231,19 @@ class LF_MMLGCN(Base_MMLGCN):
 
         match CONFIG.weighting:
             case "alpha":
-                alpha = F.normalize(self.mm_weight)
+                alpha = F.sigmoid(self.mm_weight)
                 stacked_item_emb = torch.stack(
                     [
                         item_emb * alpha,
                         *[emb.weight * (1 - alpha) for emb in self.mm_emb_list],
                     ]
                 )
+                self.weight = alpha
             case "normalized":
                 stacked_item_emb = torch.stack(
                     [
                         F.normalize(item_emb) * self.n_modalities,
-                        *[emb.weight for emb in self.mm_emb_list],
+                        *[F.normalize(emb.weight) for emb in self.mm_emb_list],
                     ]
                 )
             case "equal":
