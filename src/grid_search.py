@@ -23,7 +23,7 @@ for n_layers in [3, 2, 1, 0]:
         main(gpu_id)
 
     CONFIG.freeze = freeze
-    for weighting in ["alpha", "normalized", "equal"]:
+    for weighting in ["alpha", "normalized"]:
         CONFIG.weighting = weighting
         main(gpu_id)
     

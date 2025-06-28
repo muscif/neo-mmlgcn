@@ -7,10 +7,15 @@ requires-python = ">=3.13"
 dependencies = [
     "gputil>=1.4.0",
     "info-nce-pytorch>=0.1.4",
+    "ipykernel>=6.29.5",
+    "lmdb>=1.6.2",
     "matplotlib>=3.10.3",
     "pandas>=2.2.3",
+    "pyyaml>=6.0.2",
+    "scipy>=1.16.0",
     "tabulate>=0.9.0",
     "toml>=0.10.2",
     "torch>=2.7.0",
     "torch-geometric>=2.6.1",
+    "torchvision>=0.22.0",
 ]

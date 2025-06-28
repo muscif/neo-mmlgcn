@@ -41,77 +41,87 @@ def load_embeddings(path: Path):
 
     return embeddings
 
+def create_edge_index(interactions, num_users):
+    rows, cols = [], []
+    for user, items in interactions:
+        for item in items:
+            rows.append(int(user))
+            cols.append(int(item) + num_users)
 
-def load_dataset(path: Path):
-    def transform(line):
-        t = line.strip().split(" ")
-        user, *items = t
+    edge_index = torch.tensor([rows, cols])
 
-        return user, items
+    return edge_index
 
-    def create_edge_index(interactions):
-        rows, cols = [], []
-        for user, items in interactions:
-            for item in items:
-                rows.append(int(user))
-                cols.append(int(item))
+def transform(line):
+    t = line.strip().split(" ")
+    user, *items = t
 
-        edge_index = torch.tensor([rows, cols])
+    return user, items
 
-        return edge_index
-
+def create_validation_split(path: Path):
     with (
         open(path / "train.txt", "r", encoding="utf-8") as fin_train,
-        open(path / "test.txt", "r", encoding="utf-8") as fin_test,
+        open(path / "test.txt", "r", encoding="utf-8") as fin_test
     ):
         train = [transform(line) for line in fin_train]
         test = [transform(line) for line in fin_test]
 
-    # PyG format: user IDs should range from (0, num_users) and item IDs should range from (num_users, num_users + num_items)
-    # https://github.com/pyg-team/pytorch_geometric/discussions/8788#discussioncomment-8197084
-    # This doesn't work, raises CUDA index error
-
     users = set(int(user) for user, _ in train + test)
-    items = set(int(item) for _, iteml in train + test for item in iteml)
 
-    users_remap = {user: i for i, user in enumerate(users)}
-    items_remap = {item: i for i, item in enumerate(items)}
+    num_users = len(users)
 
-    train_remap = [
-        (users_remap[int(user)], [items_remap[int(item)] for item in iteml])
-        for user, iteml in train
-    ]
+    edge_train = create_edge_index(train, num_users)
 
-    test_remap = [
-        (users_remap[int(user)], [items_remap[int(item)] for item in iteml])
-        for user, iteml in test
-    ]
+    size = edge_train.size(1)
+    num_train = int(0.8 * size)
+    shuffled_indices = torch.randperm(size)
 
-    data = HeteroData()
+    train_indices = shuffled_indices[:num_train]
+    val_indices = shuffled_indices[num_train:]
 
-    data["user"].num_nodes = len(users)
-    data["item"].num_nodes = len(items)
+    full_train_edge_index = edge_train.clone()
+    train_edge_index = full_train_edge_index[:, train_indices]
+    val_edge_label_index = full_train_edge_index[:, val_indices]
 
-    data.num_nodes = data["user"].num_nodes + data["item"].num_nodes
+    return train_edge_index, val_edge_label_index, num_users
 
-    edge_index = create_edge_index(train_remap)
-    edge_label_index = create_edge_index(test_remap)
+def load_dataset_new(path: Path):
+    with (
+        open(path / "train.txt", "r", encoding="utf-8") as fin_train,
+        open(path / "test.txt", "r", encoding="utf-8") as fin_test,
+        open(path / "validation.txt", "r", encoding="utf-8") as fin_val,
+    ):
+        train = [transform(line) for line in fin_train]
+        val = [transform(line) for line in fin_val]
+        test = [transform(line) for line in fin_test]
 
-    data["user", "rates", "item"].edge_index = edge_index
-    data["user", "rates", "item"].edge_label_index = edge_label_index
+    users = set(int(user) for user, _ in train + val + test)
+    items = set(int(item) for _, iteml in train + val + test for item in iteml)
 
-    return data
+    num_users = len(users)
+    num_items = len(items)
 
+    edge_train = create_edge_index(train, num_users)
+    edge_val = create_edge_index(val, num_users)
+    edge_test = create_edge_index(test, num_users)
+
+    return {
+        "num_users": num_users,
+        "num_items": num_items,
+        "edge_train": edge_train,
+        "edge_val": edge_val,
+        "edge_test": edge_test
+    }
 
 def train(
-    train_loader, train_edge_label_index, num_users, num_items, optimizer, model, data
+    train_loader, edge_train, num_users, num_items, optimizer, model
 ):
     model.train()
     total_loss = total_examples = 0
 
     for index in tqdm(train_loader):
         # Sample positive and negative labels.
-        pos_edge_label_index = train_edge_label_index[:, index]
+        pos_edge_label_index = edge_train[:, index]
         neg_edge_label_index = torch.stack(
             [
                 pos_edge_label_index[0],
@@ -133,7 +143,7 @@ def train(
         )
 
         optimizer.zero_grad(set_to_none=True)
-        pos_rank, neg_rank = model(data.edge_index, edge_label_index).chunk(2)
+        pos_rank, neg_rank = model(edge_train, edge_label_index).chunk(2)
 
         rec_loss = model.recommendation_loss(
             pos_rank,
@@ -153,13 +163,13 @@ def train(
 
 
 @torch.no_grad()
-def validate(val_loader, val_edge_label_index, num_users, num_items, model, data):
+def validate(val_loader, edge_val, num_users, num_items, model, edge_train):
     model.eval()
     total_loss = total_examples = 0
 
     for index in tqdm(val_loader):
         # Sample positive and negative labels.
-        pos_edge_label_index = val_edge_label_index[:, index]
+        pos_edge_label_index = edge_val[:, index]
         neg_edge_label_index = torch.stack(
             [
                 pos_edge_label_index[0],
@@ -180,7 +190,7 @@ def validate(val_loader, val_edge_label_index, num_users, num_items, model, data
             dim=1,
         )
 
-        pos_rank, neg_rank = model(data.edge_index, edge_label_index).chunk(2)
+        pos_rank, neg_rank = model(edge_train, edge_label_index).chunk(2)
 
         rec_loss = model.recommendation_loss(
             pos_rank,
@@ -198,9 +208,9 @@ def validate(val_loader, val_edge_label_index, num_users, num_items, model, data
 
 @torch.no_grad()
 def test(
-    model, num_users, train_edge_index, test_edge_label_index, full_train_edge_index
+    model, num_users, edge_train, edge_test, edge_train_full
 ):
-    emb = model.get_embedding(train_edge_index)
+    emb = model.get_embedding(edge_train)
     user_emb, item_emb = emb[:num_users], emb[num_users:]
     res = {}
 
@@ -212,43 +222,24 @@ def test(
             logits = user_emb[start:end] @ item_emb.t()
 
             # Exclude training edges
-            # mask = (train_edge_index[0] >= start) & (train_edge_index[0] < end)
-            # logits[
-            #    train_edge_index[0, mask] - start,
-            #    train_edge_index[1, mask] - num_users,
-            # ] = float("-inf")
-
-            # Exclude training edges (use full training set, not just the split)
-            mask = (full_train_edge_index[0] >= start) & (
-                full_train_edge_index[0] < end
-            )
+            mask = (edge_train_full[0] >= start) & (edge_train_full[0] < end)
             logits[
-                full_train_edge_index[0, mask] - start,
-                full_train_edge_index[1, mask] - num_users,
+               edge_train_full[0, mask] - start,
+               edge_train_full[1, mask] - num_users,
             ] = float("-inf")
-
-            # Computing ground truth
-            # ground_truth = torch.zeros_like(logits, dtype=torch.bool)
-            # mask = (data.edge_label_index[0] >= start) & (
-            #    data.edge_label_index[0] < end
-            # )
-            # ground_truth[
-            #    data.edge_label_index[0, mask] - start,
-            #    data.edge_label_index[1, mask] - num_users,
-            # ] = True
 
             # Evaluate against test set
             ground_truth = torch.zeros_like(logits, dtype=torch.bool)
-            mask = (test_edge_label_index[0] >= start) & (
-                test_edge_label_index[0] < end
+            mask = (edge_test[0] >= start) & (
+                edge_test[0] < end
             )
             ground_truth[
-                test_edge_label_index[0, mask] - start,
-                test_edge_label_index[1, mask] - num_users,
+                edge_test[0, mask] - start,
+                edge_test[1, mask] - num_users,
             ] = True
 
             node_count = degree(
-                test_edge_label_index[0, mask] - start, num_nodes=logits.size(0)
+                edge_test[0, mask] - start, num_nodes=logits.size(0)
             )
 
             # Get top-k predictions

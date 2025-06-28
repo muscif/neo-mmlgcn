@@ -2,10 +2,10 @@ import torch
 from torch_geometric.nn import LightGCN
 from tabulate import tabulate
 import GPUtil
-from hashlib import md5
 
 from datetime import datetime
 import random
+from zoneinfo import ZoneInfo
 
 from utils import (
     train,
@@ -13,7 +13,7 @@ from utils import (
     validate,
     CONFIG,
     print_config,
-    load_dataset,
+    load_dataset_new,
     load_embeddings,
     PATH_LOG,
     PATH_DATA
@@ -28,38 +28,16 @@ def main(gpu_id):
     torch.manual_seed(CONFIG.seed)
     random.seed(CONFIG.seed)
 
-    fusion_types = {
-        "early": EF_MMLGCN,
-        "late": LF_MMLGCN,
-        "inner": IF_MMLGCN,
-    }
-
-    Model = fusion_types[CONFIG.fusion_type]
-
+    data = load_dataset_new(PATH_DATA / CONFIG.dataset)
     
-    hdata = load_dataset(PATH_DATA / CONFIG.dataset)
-    embeddings = load_embeddings(PATH_DATA / CONFIG.dataset)
-
-    num_users = hdata["user"].num_nodes
-    num_items = hdata["item"].num_nodes
-    data = hdata.to_homogeneous().to(CONFIG.device)
-
-    train_edge_index = data.edge_index
-    test_edge_label_index = data.edge_label_index
-
-    size = train_edge_index.size(1)
-    num_train = int(0.8 * size)
-    shuffled_indices = torch.randperm(size)
-    train_indices = shuffled_indices[:num_train]
-    val_indices = shuffled_indices[num_train:]
-
-    full_train_edge_index = train_edge_index.clone()
-    train_edge_index = full_train_edge_index[:, train_indices]
-    val_edge_label_index = full_train_edge_index[:, val_indices]
+    edge_train = data["edge_train"].to(CONFIG.device)
+    edge_val = data["edge_val"].to(CONFIG.device)
+    edge_test = data["edge_test"].to(CONFIG.device)
+    edge_train_full = torch.cat([edge_train, edge_val], dim=-1)
 
     # Create DataLoader for training and validation
     train_loader = torch.utils.data.DataLoader(
-        range(train_edge_index.size(1)),
+        range(edge_train.size(1)),
         shuffle=True,
         batch_size=CONFIG.batch_size,
         pin_memory=True,
@@ -67,22 +45,37 @@ def main(gpu_id):
     )
 
     val_loader = torch.utils.data.DataLoader(
-        range(val_edge_label_index.size(1)),
+        range(edge_val.size(1)),
         shuffle=True,
         batch_size=CONFIG.batch_size,
         pin_memory=True,
         pin_memory_device=CONFIG.device,
     )
 
+    num_users = data["num_users"]
+    num_items = data["num_items"]
+
+    num_nodes = num_users + num_items
+
     if CONFIG.multimodal:
+        fusion_types = {
+            "early": EF_MMLGCN,
+            "late": LF_MMLGCN,
+            "inner": IF_MMLGCN,
+        }
+
+        embeddings = load_embeddings(PATH_DATA / CONFIG.dataset)
+
+        Model = fusion_types[CONFIG.fusion_type]
+
         model = Model(
-            num_nodes=data.num_nodes,
+            num_nodes=num_nodes,
             num_layers=CONFIG.n_layers,
             pretrained_modality_embeddings=embeddings,
         ).to(CONFIG.device)
     else:
         model = LightGCN(
-            num_nodes=data.num_nodes,
+            num_nodes=num_nodes,
             embedding_dim=CONFIG.embedding_dim,
             num_layers=CONFIG.n_layers,
         ).to(CONFIG.device)
@@ -108,19 +101,18 @@ def main(gpu_id):
     for epoch in range(CONFIG.epochs):
         train_loss = train(
             train_loader,
-            train_edge_index,
+            edge_train,
             num_users,
             num_items,
             optimizer,
-            model,
-            data,
+            model
         )
 
         val_loss = validate(
-            val_loader, val_edge_label_index, num_users, num_items, model, data
+            val_loader, edge_val, num_users, num_items, model, edge_train
         )
 
-        res = test(model, num_users, train_edge_index, test_edge_label_index, full_train_edge_index)
+        res = test(model, num_users, edge_train, edge_test, edge_train_full)
 
         metrics = [epoch + 1, round(train_loss.item(), 4), round(val_loss.item(), 4)]
 
@@ -134,13 +126,11 @@ def main(gpu_id):
         print()
 
     if CONFIG.log:
-        #dt = datetime.now().replace(microsecond=0).isoformat()
+        dt = datetime.now(ZoneInfo("Europe/Rome")).replace(microsecond=0).isoformat()
         conf = out[0]
         header = out[1]
 
-        conf_hash = md5(bytes(str(conf), "utf-8")).hexdigest()
-
-        with open(PATH_LOG / f"{conf_hash}.log", "w", encoding="utf-8") as fout:
+        with open(PATH_LOG / f"{dt}.log", "w", encoding="utf-8") as fout:
             if CONFIG.weighting == "alpha":
                 fout.write(str(conf) + f"alpha: {model.weight}\n")
             else:
