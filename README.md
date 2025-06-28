@@ -18,3 +18,5 @@ To run, run ```src/main.py```; configuration will be loaded from ```src/config.t
 ```logs/``` contains the logs of the training with the metrics for each epoch; the first line contains a JSON representation of the configuration used to produce that file.
 
 `src/graph.ipynb` contains utilities to read and filter the logs, show them in tabular format and produce graphs.
+
+`src/grid_search.py` lets you run all experiments in sequence for a single dataset.
